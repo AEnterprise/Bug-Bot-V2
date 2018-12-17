@@ -1,0 +1,10 @@
+{
+  "LOGIN_TOKEN": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "BOT_LOG_CHANNEL": 123456789,
+  "EMOJI": {
+  },
+  "COGS": [
+    "Admin",
+    "PageHandler"
+  ]
+}
