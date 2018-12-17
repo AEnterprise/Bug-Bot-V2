@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from Utils import Configuration
 
-LOGGER = logging.getLogger('gearbot')
+LOGGER = logging.getLogger('bugbot')
 DISCORD_LOGGER = logging.getLogger('discord')
 
 BOT_LOG_CHANNEL: discord.TextChannel = None
