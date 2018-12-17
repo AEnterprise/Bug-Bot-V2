@@ -1,9 +1,7 @@
-import asyncio
 import logging
 import os
 import sys
 import traceback
-from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 import discord
@@ -17,8 +15,6 @@ DISCORD_LOGGER = logging.getLogger('discord')
 BOT_LOG_CHANNEL: discord.TextChannel = None
 STARTUP_ERRORS = []
 BOT: commands.AutoShardedBot = None
-LOG_PUMP = None
-LOG_ERRORS = 0
 
 
 def init_logger():
