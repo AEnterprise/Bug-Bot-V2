@@ -1,6 +1,10 @@
 {
   "LOGIN_TOKEN": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   "BOT_LOG_CHANNEL": 123456789,
+  "BUG_HUNTER": 1234,
+  "MODINATOR": 1234,
+  "EMPLOYEE": 1234,
+  "ADMINS": 1234,
   "EMOJI": {
   },
   "COGS": [
