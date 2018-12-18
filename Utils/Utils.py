@@ -29,3 +29,8 @@ async def cleanExit(bot, trigger):
     await BugBotLogging.bot_log(f"Shutdown triggered by {trigger}.")
     await bot.logout()
     await bot.close()
+
+def trim_message(message, limit):
+    if len(message) < limit - 3:
+        return message
+    return f"{message[:limit-3]}..."
