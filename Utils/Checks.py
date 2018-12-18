@@ -6,7 +6,7 @@ import Configuration
 
 def is_employee():
     async def predicate(ctx):
-        return [r for r in ctx.author.roles if r.id == Configuration.get_master_var("EMPLOYEE") or r for r in ctx.author.roles if r.id == Configuration.get_master_var("ADMINS")]
+        return [r for r in ctx.author.roles if (r.id == Configuration.get_master_var("EMPLOYEE") or r.id == Configuration.get_master_var("ADMINS"))]
     return commands.check(predicate)
 
 def is_modinator():
