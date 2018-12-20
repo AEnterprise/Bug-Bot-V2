@@ -6,3 +6,4 @@ venv/
 config/master.json
 known_messages.json
 logs/*
+config/master.yaml
