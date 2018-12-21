@@ -26,7 +26,7 @@ def valid_user(input):
 
 fields = dict(title=[no_empty, no_glitch],
               steps=[no_empty],
-              excpected=[no_empty, no_glitch],
+              expected=[no_empty, no_glitch],
               actual=[no_empty, no_glitch],
               client_info=[no_empty],
               device_info=[no_empty],
