@@ -12,25 +12,25 @@ class announcement:
     def __init__(self,bot):
         self.bot = bot
             
-    @Checks.is_employee
-    @commands.bot_has_permission(manage_roles=True)       
+    @Checks.is_employee()
+    @commands.bot_has_permissions(manage_roles=True)       
     @commands.command()
-    async def BugHunter(self, ctx: commands.Context, *, BH):
-        BugHunters = Configuration.get_role("BUG_HUNTER")
-        channel = Configuration.get_channel("BUG_HUNTER")
-        modschannel = ctx.guild.get_channel("MODINATOR")
+    async def announce(self, ctx: commands.Context, role, *, message):
+        role = Configuration.get_role(ctx, "ROLES")
+        channel = Configuration.get_channel(ctx, "CHANNELS")
+        modschannel = Configuration.get_channel(ctx, "MODINATOR")
 
-        if BugHunters is None:
+        if role is None:
             return await ctx.send("Are you sure that you have the role working?")
         
         if ctx.message.channel != modschannel:
             return
         
-        if BH != None:
+        if message != None:
             try:
-                await BugHunters.edit(mentionable=True)
-                await channel.send(f"{BugHunters.mention}\n{BH}")
-                await BugHunters.edit(mentionable=False)      
+                await role.edit(mentionable=True)
+                await channel.send(f"{role.mention}\n{message}")
+                await role.edit(mentionable=False)      
             except discord.Forbidden:
                 await ctx.send("I wasn't able to send a message in the announcement channel. Please check that I am able to talk.")
         else: 
