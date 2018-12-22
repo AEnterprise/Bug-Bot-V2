@@ -15,10 +15,10 @@ class announcement:
     @Checks.is_employee()
     @commands.bot_has_permissions(manage_roles=True)       
     @commands.command()
-    async def announce(self, ctx: commands.Context, role, *, message):
-        role = Configuration.get_role(ctx, "ROLES")
-        channel = Configuration.get_channel(ctx, "CHANNELS")
-        modschannel = Configuration.get_channel(ctx, "MODINATOR")
+    async def announce(self, ctx: commands.Context, role_name, *, message):
+        role = Configuration.get_role(ctx, role_name)
+        channel = Configuration.get_channel(ctx, role_name)
+        modschannel = Configuration.get_channel(ctx, "modinator")
 
         if role is None:
             return await ctx.send("Are you sure that you have the role working?")
