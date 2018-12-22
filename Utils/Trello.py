@@ -1,4 +1,5 @@
 import aiohttp
+import backoff
 
 from Utils import Configuration
 
@@ -9,19 +10,20 @@ class TrelloException(Exception):
     pass
 
 
-class Trello:
+class TrelloUtils:
 
-    def __init__(self, loop):
+    def __init__(self, bot):
         self._key = Configuration.get_master_var("TRELLO_KEY")
         self._token = Configuration.get_master_var("TRELLO_TOKEN")
-        self._session = aiohttp.ClientSession(loop=loop)  # TODO: Move this out so all cogs/utils can use the session
+        self.bot = bot
 
-    # TODO: Add retry functionality (e.g. backoff, tenacity...etc)
+    @backoff.on_exception(backoff.expo, aiohttp.ClientError, max_tries=3, logger='bugbot')
     async def _request(self, endpoint, payload={}, method='GET'):
         payload.update({'key': self._key, 'token': self._token})
-        async with self._session.request(method, f'{API_BASE}{endpoint}', params=payload) as resp:
+        async with self.bot.aiosession.request(method, f'{API_BASE}{endpoint}', params=payload) as resp:
             if resp.status is not 200:
-                raise TrelloException(f'Unexpected response from Trello API ({resp.status}): {resp.text}')
+                resp_text = await resp.text()
+                raise TrelloException(f'Unexpected response from Trello API ({resp.status}): {resp_text}')
             return await resp.json()
 
     # Gets basic data for a board
@@ -115,6 +117,12 @@ class Trello:
         ep = f'/cards/{card_id}/attachments'
         res = await self._request(ep, {'name': name, 'url': url}, 'POST')
         return res['id']
+
+    # Remove an attachment from a card
+    async def remove_attachment(self, card_id, attachment_id):
+        ep = f'/cards/{card_id}/attachments/{attachment_id}'
+        res = await self._request(ep, method='DELETE')
+        return True
 
     # Add a label to a card
     async def add_label(self, card_id, label_id):
