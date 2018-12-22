@@ -1,4 +1,4 @@
-import json
+import yaml
 
 from Utils import BugBotLogging
 
@@ -9,8 +9,8 @@ MASTER_LOADED = False
 def load_master():
     global MASTER_CONFIG, MASTER_LOADED
     try:
-        with open('config/master.json', 'r') as jsonfile:
-            MASTER_CONFIG = json.load(jsonfile)
+        with open('config/master.yaml', 'r') as yamlfile:
+            MASTER_CONFIG = yaml.load(yamlfile)
             MASTER_LOADED = True
     except FileNotFoundError:
         BugBotLogging.error("Unable to load config, running with defaults.")
@@ -32,5 +32,12 @@ def get_master_var(key, default=None):
 
 def save_master():
     global MASTER_CONFIG
-    with open('config/master.json', 'w') as jsonfile:
-        jsonfile.write((json.dumps(MASTER_CONFIG, indent=4, skipkeys=True, sort_keys=True)))
+    with open('config/master.yaml', 'w') as yamlfile:
+        yaml.dump(MASTER_CONFIG, yamlfile, default_flow_style=False)
+
+
+def get_role(ctx, name):
+    return ctx.guild.get_role(get_master_var("ROLES")[name.upper()])
+
+def get_channel(ctx, name):
+    return ctx.bot.get_channel(get_master_var("CHANNELS")[name.upper()])
