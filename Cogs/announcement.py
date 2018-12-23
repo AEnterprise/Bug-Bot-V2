@@ -21,18 +21,18 @@ class announcement:
         modschannel = Configuration.get_channel(ctx, "modinator")
 
         if role is None:
-            return await ctx.send("Are you sure that you have the role working?")
+            return await ctx.send("This role may be either deleted or not configured properly.")
         
         if ctx.message.channel != modschannel:
-            return
+            return await ctx.send("This feature only works in the modinator channel. Sorry about it!")
         
         if message != None:
+            await role.edit(mentionable=True)
             try:
-                await role.edit(mentionable=True)
-                await channel.send(f"{role.mention}\n{message}")
-                await role.edit(mentionable=False)      
+                await channel.send(f"{role.mention}\n{message}") 
             except discord.Forbidden:
                 await ctx.send("I wasn't able to send a message in the announcement channel. Please check that I am able to talk.")
+            await role.edit(mentionable=False)
         else: 
             await ctx.send("I am unsure of what you are attempting to do.")
 
