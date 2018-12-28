@@ -5,12 +5,13 @@ import traceback
 from argparse import ArgumentParser
 from datetime import datetime
 
+import aiohttp
 from discord import Activity, Embed, Colour
 from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
@@ -23,6 +24,7 @@ async def on_ready():
         Pages.initialize()
         Emoji.initialize(bugbot)
         await BugBotLogging.initialize(bugbot)
+        bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
             try:
@@ -30,6 +32,7 @@ async def on_ready():
             except Exception as e:
                 BugBotLogging.exception(f"Failed to load extention {extension}", e)
         BugBotLogging.info("Cogs loaded")
+        bugbot.trello = Trello.TrelloUtils(bugbot)
         await BugBotLogging.bot_log("Here we go!")
         bugbot.STARTUP_COMPLETE = True
     # we got the ready event, usually means we resumed, make sure the status is still there
