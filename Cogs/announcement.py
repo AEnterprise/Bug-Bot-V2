@@ -40,8 +40,16 @@ class announcement:
     @commands.command()
     async def update(self, ctx: commands.Context, role_name, message_id:int, *, new_message):
         channel = Configuration.get_channel(ctx, role_name)
-        message = await channel.get_message(message_id)
         modschannel = Configuration.get_channel(ctx, "modinator")
+        try:
+            message = await channel.get_message(message_id)
+        except (discord.Forbidden) as e:
+            await ctx.send("Hmmm.. Seems like I no longer have READ_MESSAGES permission for that channel for some reason.")
+            return
+        except (discord.Forbidden, discord.NotFound) as e:
+            await ctx.send("It is possible that you gave me the wrong ID or I cannot find the message in the channel due to either the message or channel being deleted.")
+            return
+
         if channel is None:
             return await ctx.send("Are you sure this is in a correct channel?")
         if ctx.message.channel != modschannel:
