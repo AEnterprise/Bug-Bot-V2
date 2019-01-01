@@ -18,7 +18,7 @@ class BugHunter:
         if any([r for r in member.roles if r.id in role_ids]):
             return
         # Add the initiate role
-        initiate_role = discord.utils.get(member.guild.roles, id=Configuration.get_master_var('ROLES')['INITIATE'])
+        initiate_role = Configuration.get_role('INITIATE')
         try:
             await member.add_roles(initiate_role)
         except (discord.Forbidden, discord.HTTPException):
@@ -38,8 +38,10 @@ class BugHunter:
     async def on_message(self, message):
         if not isinstance(message.channel, discord.DMChannel):
             return
+        if message.content.startswith(self.bot.command_prefix):
+            return
         # Check if they're an initiate
-        dt = self.bot.get_guild(Configuration.get_master_var('DTESTERS_ID'))
+        dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
         tester = dt.get_member(message.author.id)
         if tester is not None:
             initiate_role = discord.utils.get(tester.roles, id=Configuration.get_master_var('ROLES')['INITIATE'])
@@ -51,7 +53,7 @@ class BugHunter:
                     # Remove the initiate role and add BH
                     roles = tester.roles
                     roles.remove(initiate_role)
-                    bh_role = discord.utils.get(dt.roles, id=Configuration.get_master_var('ROLES')['BUG_HUNTER'])
+                    bh_role = Configuration.get_role('BUG_HUNTER')
                     roles.append(bh_role)
                     try:
                         await tester.edit(roles=roles, reason='Became a Bug Hunter')
@@ -68,7 +70,7 @@ class BugHunter:
                         tstr = f'{int(hours)}h {int(mins)}m {int(secs)}s'
                         await BugBotLogging.bot_log(Configuration.get_master_var('STRINGS')['INITIATE_TIME_TAKEN'].format(tester=tester, time=tstr))
                         # Welcome them in BHGC
-                        bhgc = Configuration.get_channel(self, 'BUG_HUNTER')
+                        bhgc = Configuration.get_channel('BUG_HUNTER')
                         await bhgc.send(Configuration.get_master_var('STRINGS')['BH_WELCOME'].format(tester=tester))
                 else:
                     # Wrong phrase
