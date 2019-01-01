@@ -23,6 +23,7 @@ async def on_ready():
     if not bugbot.STARTUP_COMPLETE:
         Pages.initialize()
         Emoji.initialize(bugbot)
+        Configuration.initialize(bugbot)
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
