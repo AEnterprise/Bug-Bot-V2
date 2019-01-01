@@ -55,17 +55,13 @@ class TrelloUtils:
     async def archive_card(self, card_id):
         ep = f'/cards/{card_id}'
         res = await self._request(ep, {'closed': True}, 'PUT')
-        if res['closed']:
-            return True
-        return False
+        return res['closed']
 
     # Unarchive a card
     async def unarchive_card(self, id):
         ep = f'/cards/{id}'
         res = await self._request(ep, {'closed': False}, 'PUT')
-        if not res['closed']:
-            return True
-        return False
+        return not res['closed']
 
     # Add a card with a title (short description) and content (everything else). Will return the shortLink ID
     async def add_card(self, list_id, title, content):
