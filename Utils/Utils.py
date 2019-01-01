@@ -27,6 +27,7 @@ def escape_markdown(text):
 
 async def cleanExit(bot, trigger):
     await BugBotLogging.bot_log(f"Shutdown triggered by {trigger}.")
+    await bot.aiosession.close()
     await bot.logout()
     await bot.close()
 
