@@ -46,7 +46,7 @@ class announcement:
         except (discord.Forbidden) as e:
             await ctx.send("Hmmm.. Seems like I no longer have READ_MESSAGES permission for that channel for some reason.")
             return
-        except (discord.Forbidden, discord.NotFound) as e:
+        except (discord.NotFound) as e:
             await ctx.send("It is possible that you gave me the wrong ID or I cannot find the message in the channel due to either the message or channel being deleted.")
             return
 
