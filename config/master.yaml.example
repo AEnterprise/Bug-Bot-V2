@@ -2,8 +2,9 @@ BOT_LOG_CHANNEL: 524341302880501760
 COGS:
   - Admin
   - PageHandler
-  - announcement
+  - Announcement
   - BugHunter
+  - Moderation
 LOGIN_TOKEN: https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ROLES:
   BUG_HUNTER: 1234
