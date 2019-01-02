@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import time
@@ -35,10 +36,17 @@ async def on_ready():
                 BugBotLogging.exception(f"Failed to load extention {extension}", e)
         BugBotLogging.info("Cogs loaded")
         bugbot.trello = Trello.TrelloUtils(bugbot)
+        bugbot.loop.create_task(keepDBalive())  # ping DB every hour so it doesn't disconnect
         await BugBotLogging.bot_log("Here we go!")
         bugbot.STARTUP_COMPLETE = True
     # we got the ready event, usually means we resumed, make sure the status is still there
     await bugbot.change_presence(activity=Activity(type=3, name='over the bug boards'))
+
+
+async def keepDBalive():
+    while not bugbot.is_closed():
+        DataUtils.connection.connection().ping(True)
+        await asyncio.sleep(3600)
 
 @bugbot.event
 async def on_command_error(ctx: commands.Context, error):
