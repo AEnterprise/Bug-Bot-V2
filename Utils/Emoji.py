@@ -32,6 +32,19 @@ BACKUPS = {
     "CLOCK": "⏰"
 }
 
+SELF_ASSIGNABLE_ROLES = {
+    "linux": "🐧",
+    "android": "🤖",
+    "ios": "📱",
+    "desktop": "🖥",
+    "canary": "🐦",
+    "mac": "🍎",
+    "employee": "🍎",
+    "not employee": "🍎",
+    "admin": "🍎"
+
+}
+
 
 def initialize(bot):
     for name, eid in Configuration.get_master_var("EMOJI", {}).items():
