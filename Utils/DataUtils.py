@@ -38,7 +38,8 @@ class Bug(Model):
     state = EnumField(BugState, default=0)
     reported_at = DateTimeField(default=datetime.utcnow)
     xp_awarded = BooleanField(default=False)
-    last_state_change = DateTimeField(null=False)
+    last_state_change = DateTimeField(default=datetime.utcnow)
+    trello_id = CharField(max_length=30, null=True)
 
     class Meta:
         database = connection
@@ -51,6 +52,7 @@ class BugInfo(Model):
     bug = ForeignKeyField(Bug, backref="info")  # link to ticket
     type = EnumField(BugInfoType)
     added = DateTimeField(default=datetime.utcnow)
+    trello_id = CharField(max_length=30)
 
     class Meta:
         database = connection
