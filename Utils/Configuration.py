@@ -4,6 +4,13 @@ from Utils import BugBotLogging
 
 MASTER_CONFIG = dict()
 MASTER_LOADED = False
+BOT = None
+
+
+def initialize(bot):
+    global BOT
+    BOT = bot
+    load_master()
 
 
 def load_master():
@@ -36,8 +43,9 @@ def save_master():
         yaml.dump(MASTER_CONFIG, yamlfile, default_flow_style=False)
 
 
-def get_role(ctx, name):
-    return ctx.guild.get_role(get_master_var("ROLES")[name.upper()])
+def get_role(name):
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_role(get_master_var("ROLES").get(name.upper(), None))
 
-def get_channel(ctx, name):
-    return ctx.bot.get_channel(get_master_var("CHANNELS")[name.upper()])
+
+def get_channel(name):
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("CHANNELS").get(name.upper(), None))

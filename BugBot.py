@@ -23,6 +23,7 @@ async def on_ready():
     if not bugbot.STARTUP_COMPLETE:
         Pages.initialize()
         Emoji.initialize(bugbot)
+        Configuration.initialize(bugbot)
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
@@ -38,8 +39,8 @@ async def on_ready():
     # we got the ready event, usually means we resumed, make sure the status is still there
     await bugbot.change_presence(activity=Activity(type=3, name='over the bug boards'))
 
-
-async def on_command_error(bot, ctx: commands.Context, error):
+@bugbot.event
+async def on_command_error(ctx: commands.Context, error):
     # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
     # TODO: cleanup if any of these is in a reporting channel?
     if isinstance(error, commands.NoPrivateMessage):
@@ -63,7 +64,7 @@ async def on_command_error(bot, ctx: commands.Context, error):
         return
 
     else:
-        await handle_exception("Command execution failed", bot, error.original, ctx=ctx)
+        await handle_exception("Command execution failed", error.original, ctx=ctx)
         # notify caller
         await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:")
 
@@ -84,13 +85,13 @@ def extract_info(o):
         info += str(o) + " "
     return info
 
-
-async def on_error(bot, event, *args, **kwargs):
+@bugbot.event
+async def on_error(event, *args, **kwargs):
     t, exception, info = sys.exc_info()
-    await handle_exception("Event handler failure", bot, exception, event, None, None, *args, **kwargs)
+    await handle_exception("Event handler failure", exception, event, None, None, *args, **kwargs)
 
 
-async def handle_exception(exception_type, bot, exception, event=None, message=None, ctx=None, *args, **kwargs):
+async def handle_exception(exception_type, exception, event=None, message=None, ctx=None, *args, **kwargs):
     embed = Embed(colour=Colour(0xff0000),
                   timestamp=datetime.utcfromtimestamp(time.time()))
 
