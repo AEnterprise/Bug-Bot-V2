@@ -2,8 +2,9 @@ BOT_LOG_CHANNEL: 524341302880501760
 COGS:
   - Admin
   - PageHandler
-  - announcement
+  - Announcement
   - BugHunter
+  - Moderation
 LOGIN_TOKEN: https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ROLES:
   BUG_HUNTER: 1234
@@ -25,3 +26,9 @@ STRINGS:
   WRONG_PHRASE: "Sorry, that's not the correct phrase. Just read carefully and you'll find it, I promise!"
   INITIATE_TIME_TAKEN: "{tester} took {time} to find the secret phrase and is now a full Bug Hunter!"
   NEW_INITIATE: "Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.\nOnce you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!"
+DATABASE:
+  NAME: BugBot
+  USER: BugBot
+  PASSWORD: REDACTED
+  HOST: localhost
+  PORT: 3306
