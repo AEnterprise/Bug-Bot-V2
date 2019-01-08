@@ -1,13 +1,17 @@
 BOT_LOG_CHANNEL: 1234
+LOGIN_TOKEN: 1234
 COGS:
   - Admin
   - PageHandler
-LOGIN_TOKEN: 1234
+  - Announcement
+  - BugHunter
+  - Moderation
 ROLES:
   BUG_HUNTER: 1342
   MODINATOR: 1234
   EMPLOYEE: 1324
   ANDROID: 1234
+  INITIATE: 1234
 CHANNELS:
   BUG_HUNTER: 1324
   MODINATOR: 1234
@@ -16,3 +20,15 @@ CHANNELS:
 TRELLO_KEY: xyz123
 TRELLO_TOKEN: xyz123
 GUILD_ID: 411673927698350100
+INITIATE_PHRASE: cereal is a soup
+STRINGS:
+  BH_WELCOME: "Everyone, please welcome the newest addition to the Bug Hunter:tm:s, {tester.mention}! Make sure they feel the love! <:dabHeart:456143314312495125>"
+  WRONG_PHRASE: "Sorry, that's not the correct phrase. Just read carefully and you'll find it, I promise!"
+  INITIATE_TIME_TAKEN: "{tester} took {time} to find the secret phrase and is now a full Bug Hunter!"
+  NEW_INITIATE: "Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.\nOnce you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!"
+DATABASE:
+  NAME: BugBot
+  USER: BugBot
+  PASSWORD: REDACTED
+  HOST: localhost
+  PORT: 3306

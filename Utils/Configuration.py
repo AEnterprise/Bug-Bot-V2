@@ -44,8 +44,8 @@ def save_master():
 
 
 def get_role(name):
-    return BOT.get_guild(get_master_var('GUILD_ID')).get_role(get_master_var("ROLES")[name.upper()])
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_role(get_master_var("ROLES").get(name.upper(), None))
 
 
 def get_channel(name):
-    return BOT.get_guild(get_master_var('GUILD_ID')), get_channel(get_master_var("CHANNELS")[name.upper()])
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("CHANNELS").get(name.upper(), None))

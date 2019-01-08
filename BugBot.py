@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import time
@@ -11,7 +12,7 @@ from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
@@ -24,6 +25,7 @@ async def on_ready():
         Pages.initialize()
         Emoji.initialize(bugbot)
         Configuration.initialize(bugbot)
+        DataUtils.init()
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
@@ -34,13 +36,20 @@ async def on_ready():
                 BugBotLogging.exception(f"Failed to load extention {extension}", e)
         BugBotLogging.info("Cogs loaded")
         bugbot.trello = Trello.TrelloUtils(bugbot)
+        bugbot.loop.create_task(keepDBalive())  # ping DB every hour so it doesn't disconnect
         await BugBotLogging.bot_log("Here we go!")
         bugbot.STARTUP_COMPLETE = True
     # we got the ready event, usually means we resumed, make sure the status is still there
     await bugbot.change_presence(activity=Activity(type=3, name='over the bug boards'))
 
 
-async def on_command_error(bot, ctx: commands.Context, error):
+async def keepDBalive():
+    while not bugbot.is_closed():
+        DataUtils.connection.connection().ping(True)
+        await asyncio.sleep(3600)
+
+@bugbot.event
+async def on_command_error(ctx: commands.Context, error):
     # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
     # TODO: cleanup if any of these is in a reporting channel?
     if isinstance(error, commands.NoPrivateMessage):
@@ -64,7 +73,7 @@ async def on_command_error(bot, ctx: commands.Context, error):
         return
 
     else:
-        await handle_exception("Command execution failed", bot, error.original, ctx=ctx)
+        await handle_exception("Command execution failed", error.original, ctx=ctx)
         # notify caller
         await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:")
 
@@ -85,13 +94,13 @@ def extract_info(o):
         info += str(o) + " "
     return info
 
-
-async def on_error(bot, event, *args, **kwargs):
+@bugbot.event
+async def on_error(event, *args, **kwargs):
     t, exception, info = sys.exc_info()
-    await handle_exception("Event handler failure", bot, exception, event, None, None, *args, **kwargs)
+    await handle_exception("Event handler failure", exception, event, None, None, *args, **kwargs)
 
 
-async def handle_exception(exception_type, bot, exception, event=None, message=None, ctx=None, *args, **kwargs):
+async def handle_exception(exception_type, exception, event=None, message=None, ctx=None, *args, **kwargs):
     embed = Embed(colour=Colour(0xff0000),
                   timestamp=datetime.utcfromtimestamp(time.time()))
 
