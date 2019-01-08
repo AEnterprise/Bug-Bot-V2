@@ -38,11 +38,11 @@ class BugHunter:
             await BugBotLogging.bot_log(f':mortar_board: Added the initiate role to {member} due to an approved bug')
             # Send DM
             try:
-                await member.send(Configuration.get_master_var('STRINGS')['NEW_INITIATE'])
+                await member.send(Configuration.get_var('strings', 'NEW_INITIATE'))
             except discord.Forbidden:
                 # Closed DMs
                 pass
-            (Hunter.insert(id=member.id)
+            (Hunter.insert(id=member.id, initiate_at=datetime.utcnow())
                    .on_conflict(update={
                        Hunter.initiate_at: datetime.utcnow(),
                        Hunter.hunter_at: None})
@@ -61,7 +61,7 @@ class BugHunter:
             initiate_role = discord.utils.get(tester.roles, id=Configuration.get_master_var('ROLES')['INITIATE'])
             if initiate_role:
                 # They're an initiate. Check for the phrase
-                if message.clean_content.lower() == Configuration.get_master_var('INITIATE_PHRASE').lower():
+                if message.clean_content.lower() == Configuration.get_var('bugbot', 'INITIATE_PHRASE').lower():
                     # Phrase matches
                     phrase_received = datetime.utcnow()
                     # Remove the initiate role and add BH
@@ -85,13 +85,13 @@ class BugHunter:
                         hours, rem = divmod(time_taken, 3600)
                         mins, secs = divmod(rem, 60)
                         tstr = f'{int(hours)}h {int(mins)}m {int(secs)}s'
-                        await BugBotLogging.bot_log(Configuration.get_master_var('STRINGS')['INITIATE_TIME_TAKEN'].format(tester=tester, time=tstr))
+                        await BugBotLogging.bot_log(Configuration.get_var('strings', 'INITIATE_TIME_TAKEN').format(tester=tester, time=tstr))
                         # Welcome them in BHGC
                         bhgc = Configuration.get_channel('BUG_HUNTER')
-                        await bhgc.send(Configuration.get_master_var('STRINGS')['BH_WELCOME'].format(tester=tester))
+                        await bhgc.send(Configuration.get_var('strings', 'BH_WELCOME').format(tester=tester))
                 else:
                     # Wrong phrase
-                    await message.channel.send(Configuration.get_master_var('STRINGS')['WRONG_PHRASE'])
+                    await message.channel.send(Configuration.get_var('strings', 'WRONG_PHRASE'))
 
 
 def setup(bot):
