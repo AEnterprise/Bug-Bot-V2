@@ -49,3 +49,7 @@ def get_role(name):
 
 def get_channel(name):
     return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("CHANNELS").get(name.upper(), None))
+
+
+def get_bugchannel(name):
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("BUGCHANNELS").get(name.upper(), None))
