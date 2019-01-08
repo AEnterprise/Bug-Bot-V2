@@ -1,25 +1,25 @@
-BOT_LOG_CHANNEL: 524341302880501760
+BOT_LOG_CHANNEL: 1234
+LOGIN_TOKEN: 1234
 COGS:
   - Admin
   - PageHandler
   - Announcement
   - BugHunter
   - Moderation
-LOGIN_TOKEN: https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ROLES:
-  BUG_HUNTER: 1234
+  BUG_HUNTER: 1342
   MODINATOR: 1234
-  EMPLOYEE: 1234
+  EMPLOYEE: 1324
   ANDROID: 1234
   INITIATE: 1234
 CHANNELS:
-  BUG_HUNTER: 1234
+  BUG_HUNTER: 1324
   MODINATOR: 1234
   EMPLOYEE: 1234
-  ANDROID: 4567
+  ANDROID: 1234
 TRELLO_KEY: xyz123
 TRELLO_TOKEN: xyz123
-GUILD_ID: 258274103935369219
+GUILD_ID: 411673927698350100
 INITIATE_PHRASE: cereal is a soup
 STRINGS:
   BH_WELCOME: "Everyone, please welcome the newest addition to the Bug Hunter:tm:s, {tester.mention}! Make sure they feel the love! <:dabHeart:456143314312495125>"
