@@ -20,10 +20,21 @@ class BugInfoType(Enum):
     can_reproduce = 0
     can_not_reproduce = 1
     note = 2
+    attachment = 3
 
 
 class TransactionEvent(Enum):
-    queue_action = 0
-    repro = 1
-    vote = 2
-    fun = 3
+    can_repro = 0
+    cannot_repro = 1
+    approve = 2
+    deny = 3
+    attach = 4
+    revoke = 5
+    bug_verified = 6
+    hug = 7
+    fight = 8
+    bunny = 9
+    vote = 10
+    reward = 11
+    xp_taken = 12
+    purchase = 13

@@ -91,7 +91,34 @@ class Transaction(Model):
         database = connection
 
 
+class StoreItem(Model):
+    id = PrimaryKeyField()
+    name = CharField(collation="utf8mb4_general_ci")
+    cost = SmallIntegerField()
+    description = CharField(max_length=500, collation="utf8mb4_general_ci")
+    link = CharField(collation="utf8mb4_general_ci", null=True)
+    physical = BooleanField()
+    expires_after = IntegerField(null=True)
+    role_id = BigIntegerField(null=True)
+    in_stock = BooleanField(default=True)
+
+    class Meta:
+        database = connection
+
+
+class Purchase(Model):
+    id = PrimaryKeyField()
+    timestamp = DateTimeField(default=datetime.utcnow)
+    hunter = ForeignKeyField(BugHunter, backref="purchases")
+    item = ForeignKeyField(StoreItem, backref="purchases")
+    expired = BooleanField(default=False)
+    fulfilled = BooleanField(default=False)  # not currently used
+
+    class Meta:
+        database = connection
+
+
 def init():
     connection.connect()
-    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction])
+    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, StoreItem, Purchase])
     connection.close()
