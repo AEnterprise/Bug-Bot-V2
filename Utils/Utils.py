@@ -1,5 +1,4 @@
 import json
-import discord
 from Utils import BugBotLogging, Configuration
 
 def fetch_from_disk(filename, alternative=None):
