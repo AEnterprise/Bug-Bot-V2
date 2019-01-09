@@ -1,11 +1,13 @@
 <?php
+    $configs = include('config.php');
+
     ini_set('display_errors', 1);
     ini_set('display_startup_errors', 1);
     error_reporting(E_ALL);
     if (isset($_GET["error"])) {
         echo json_encode(array("message" => "Authorization Error"));
     } elseif (isset($_GET["code"])) {
-        $redirect_uri = "https://misteristavo.lt/Salna/";
+        $redirect_uri = $configs->redirect_uri;
         $token_request = "https://discordapp.com/api/oauth2/token";
         $token = curl_init();
         curl_setopt_array($token, array(
@@ -13,8 +15,8 @@
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => array(
                 "grant_type" => "authorization_code",
-                "client_id" => "426726618820640779",
-                "client_secret" => "nn9AyhJ9QMPsz7Lmp9V9mpXZNpC5jePP",
+                "client_id" => $configs->client_id,
+                "client_secret" => $configs->client_secret,
                 "redirect_uri" => $redirect_uri,
                 "code" => $_GET["code"]
             )
@@ -41,6 +43,6 @@
             echo json_encode(array("message" => "Authentication Error"));
         }
     } else {
-        Header("Location: https://discordapp.com/oauth2/authorize?client_id=426726618820640779&response_type=code&scope=identify");
+        Header("Location: https://discordapp.com/oauth2/authorize?client_id=".$configs->client_id."&response_type=code&scope=identify");
     }
 ?>
