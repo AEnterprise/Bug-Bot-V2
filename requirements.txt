@@ -1,1 +1,4 @@
 git+https://github.com/Rapptz/discord.py@rewrite
+backoff==1.8.0
+PyMySQL==0.9.2
+peewee==3.7.1
