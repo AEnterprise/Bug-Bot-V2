@@ -19,22 +19,21 @@ bugbot.STARTUP_COMPLETE = False
 
 async def restart_cleanup():
     for key in Configuration.get_master_var("BUGCHANNELS").items():
-        for x in range(1):
-            channel = Configuration.get_bugchannel(key[0])
-            async for message in channel.history(limit=1):
-                if message.author.id == bugbot.user.id:
-                    if message.content == Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"):
-                        await message.delete()
-            g = bugbot.get_guild(Configuration.get_master_var("GUILD_ID"))
-            r = g.get_role(Configuration.get_master_var("GUILD_ID"))
-            overwrites_everyone = channel.overwrites_for(r)
-            overwrites_bh = channel.overwrites_for(Configuration.get_role("BUG_HUNTER"))
-            if channel.id == Configuration.get_master_var("BUGCHANNELS").get("QUEUE"):
-                overwrites_bh.send_messages = True
-                await channel.set_permissions(Configuration.get_role("BUG_HUNTER"), overwrite=overwrites_bh, reason="Bot unlock after previous restart..")
-            else:
-                overwrites_everyone.send_messages = True
-                await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot unlock after previous restart..")
+        channel = Configuration.get_bugchannel(key[0])
+        async for message in channel.history(limit=1):
+            if message.author.id == bugbot.user.id:
+                if message.content == Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"):
+                    await message.delete()
+        g = bugbot.get_guild(Configuration.get_master_var("GUILD_ID"))
+        r = g.get_role(Configuration.get_master_var("GUILD_ID"))
+        overwrites_everyone = channel.overwrites_for(r)
+        overwrites_bh = channel.overwrites_for(Configuration.get_role("BUG_HUNTER"))
+        if channel.id == Configuration.get_master_var("BUGCHANNELS").get("QUEUE"):
+            overwrites_bh.send_messages = True
+            await channel.set_permissions(Configuration.get_role("BUG_HUNTER"), overwrite=overwrites_bh, reason="Bot unlock after previous restart..")
+        else:
+            overwrites_everyone.send_messages = True
+            await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot unlock after previous restart..")
 
 @bugbot.event
 async def on_ready():

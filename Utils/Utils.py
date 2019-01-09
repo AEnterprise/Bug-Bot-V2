@@ -22,19 +22,18 @@ def escape_markdown(text):
 
 async def lockdown_shutdown(bot):
     for key in Configuration.get_master_var("BUGCHANNELS").items():
-        for x in range(1):
-            channel = Configuration.get_bugchannel(key[0])
-            await channel.send(Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"))
-            g = bot.get_guild(Configuration.get_master_var("GUILD_ID"))
-            r = g.get_role(Configuration.get_master_var("GUILD_ID"))
-            overwrites_everyone = channel.overwrites_for(r)
-            overwrites_bh = channel.overwrites_for(Configuration.get_role("BUG_HUNTER"))
-            if channel.id == Configuration.get_master_var("BUGCHANNELS").get("QUEUE"):
-                overwrites_bh.send_messages = False
-                await channel.set_permissions(Configuration.get_role("BUG_HUNTER"), overwrite=overwrites_bh, reason="Bot restart triggered.")
-            else:
-                overwrites_everyone.send_messages = False
-                await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot restart triggered.")
+        channel = Configuration.get_bugchannel(key[0])
+        await channel.send(Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"))
+        g = bot.get_guild(Configuration.get_master_var("GUILD_ID"))
+        r = g.get_role(Configuration.get_master_var("GUILD_ID"))
+        overwrites_everyone = channel.overwrites_for(r)
+        overwrites_bh = channel.overwrites_for(Configuration.get_role("BUG_HUNTER"))
+        if channel.id == Configuration.get_master_var("BUGCHANNELS").get("QUEUE"):
+            overwrites_bh.send_messages = False
+            await channel.set_permissions(Configuration.get_role("BUG_HUNTER"), overwrite=overwrites_bh, reason="Bot restart triggered.")
+        else:
+            overwrites_everyone.send_messages = False
+            await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot restart triggered.")
 
 async def cleanExit(bot, trigger):
     await BugBotLogging.bot_log(f"Shutdown triggered by {trigger}.")
