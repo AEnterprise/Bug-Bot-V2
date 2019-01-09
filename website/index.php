@@ -1,4 +1,5 @@
 <?php
+            $configs = include('config.php');
             ini_set('display_errors', 1);
             ini_set('display_startup_errors', 1);
             error_reporting(E_ALL);
@@ -7,7 +8,7 @@
             } elseif (isset($_GET["code"])) {
                 Header("Location: login.php?code={$_GET["code"]}");
             } else {
-                Header("Location: https://discordapp.com/oauth2/authorize?client_id=426726618820640779&response_type=code&scope=identify");
+                Header("Location: https://discordapp.com/oauth2/authorize?client_id=".$configs->client_id."&response_type=code&scope=identify");
             }
 ?>
 <!DOCTYPE html>
