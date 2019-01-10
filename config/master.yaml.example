@@ -6,6 +6,7 @@ COGS:
   - Announcement
   - BugHunter
   - Moderation
+  - BugReporting
 ROLES:
   BUG_HUNTER: 1342
   MODINATOR: 1234
@@ -34,6 +35,7 @@ STRINGS:
   INITIATE_TIME_TAKEN: "{tester} took {time} to find the secret phrase and is now a full Bug Hunter!"
   NEW_INITIATE: "Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.\nOnce you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!"
   LOCKDOWN_MESSAGE: "The bot is being restarted, and the bug reporting process has been put on hold temporarily."
+  NON_COMMANDS_MSG: "Hey {user} this channel is only for bot commands. If you need help with something, try reading <#342043548369158156> or <#342060723721207810>!"
 DATABASE:
   NAME: BugBot
   USER: BugBot
