@@ -12,7 +12,7 @@ from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisListener
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
