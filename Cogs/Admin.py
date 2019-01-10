@@ -24,6 +24,7 @@ class Admin:
     async def restart(self, ctx):
         """Restarts the bot"""
         await ctx.send("Restarting...")
+        await Utils.lockdown_shutdown(self.bot)
         await Utils.cleanExit(self.bot, ctx.author.name)
 
     @commands.command(hidden=True)
