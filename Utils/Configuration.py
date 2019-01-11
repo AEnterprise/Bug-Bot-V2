@@ -66,6 +66,26 @@ def get_var(group, key):
 def get_role(name):
     return BOT.get_guild(get_master_var('GUILD_ID')).get_role(get_master_var("ROLES").get(name.upper(), None))
 
+def list_of_role_ids():
+    list_of_ids = []
+    for key in get_master_var("ROLES").items():
+        list_of_ids.append(key[1])
+    return list_of_ids
+
+
+def list_of_bugchannels_ids():
+    list_of_ids = []
+    for key in get_master_var("BUGCHANNELS").items():
+        list_of_ids.append(key[1])
+    return list_of_ids
+
+
+def list_of_channels_ids():
+    list_of_ids = []
+    for key in get_master_var("CHANNELS").items():
+        list_of_ids.append(key[1])
+    return list_of_ids
+
 
 def get_channel(name):
     return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("CHANNELS").get(name.upper(), None))
