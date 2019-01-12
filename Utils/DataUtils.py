@@ -124,6 +124,10 @@ class Purchase(Model):
     expired = BooleanField(default=False)
     fulfilled = BooleanField(default=False)  # not currently used
 
+    class Meta:
+        database = connection
+
+
 def init():
     connection.connect()
     connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase])
