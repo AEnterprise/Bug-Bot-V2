@@ -73,7 +73,7 @@ class BugReporting:
     async def storeinfo(self, ctx):
         """Command for managing storeinfo"""
         if ctx.invoked_subcommand is None:
-            # Get all the stored information the command invoker
+            # Get all the stored information from the command invoker
             Windows = Storeinfo.get_or_none(userid=ctx.author.id, platform=Platforms.desktop)
             Mac = Storeinfo.get_or_none(userid=ctx.author.id, platform=Platforms.mac)
             Linux = Storeinfo.get_or_none(userid=ctx.author.id, platform=Platforms.linux)
@@ -97,7 +97,7 @@ class BugReporting:
             e.add_field(name="📱 iOS -i:", value=iOS.information if iOS is not None else "None")
             e.set_thumbnail(url=ctx.author.avatar_url)
             e.set_author(name=f"{ctx.author}'s storeinfo!")
-            try: # Try to send a DM to the command invoker, if it fails. Log to bot log and leave a message in thee channel they ran the command in and delete after a few secconds.
+            try: # Try to send a DM to the command invoker, if it fails. Log to bot log and leave a message in the channel they ran the command in and delete after a few secconds.
                 await ctx.author.send(content=f"Hello there {ctx.author}! Here’s all of the information we have stored for you:", embed=e)
             except discord.Forbidden:
                 await self._forbidden_msg(ctx)
@@ -149,7 +149,7 @@ class BugReporting:
             await self._edited_log_to_botlog(ctx, platform, old_information, information)
             if ctx.guild is not None:
                 await ctx.message.delete()
-        else: # If it does not exist, creat eit for them and let them know it did not exist, but one was made for them.
+        else: # If it does not exist, create it for them and let them know it did not exist, but one was made for them.
             await self._add_storeinfo(ctx.author.id, platform, information)
             await self._added_log_to_botlog(ctx, platform, information)
             try:
