@@ -8,6 +8,7 @@ class Platforms(Enum):
     linux = 3
     store = 4
     marketing = 5
+    mac = 6 # for storeinfo
 
 
 class BugState(Enum):
