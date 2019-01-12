@@ -149,7 +149,7 @@ class BugReporting:
             await self._edited_log_to_botlog(ctx, platform, old_information, information)
             if ctx.guild is not None:
                 await ctx.message.delete()
-        else: # If it does not exist, creat eit for them and let them know it did not exist, but one was made for them.
+        else: # If it does not exist, create it for them and let them know it did not exist, but one was made for them.
             await self._add_storeinfo(ctx.author.id, platform, information)
             await self._added_log_to_botlog(ctx, platform, information)
             try:
