@@ -59,7 +59,7 @@ class Experience:
                             amount = Configuration.get_var('bugbot', 'XP').get('DEAD_BUG')
                             user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id)
                             member = dt.get_member(user_id)
-                            await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` marked as dead. Gave {amount} XP to {member} ({user_id})')
+                            await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` marked as dead. Gave {amount} XP to {member} (`{user_id}`)')
                         else:
                             # Loop through the priority label sets (P0 - P3)
                             for severity, data in Configuration.get_var('bugbot', 'TRELLO').get('PRIORITIES').items():
@@ -67,7 +67,7 @@ class Experience:
                                     amount = Configuration.get_var('bugbot', 'XP').get('VERIFIED_BUG') + data['XP_BONUS']
                                     user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id)
                                     member = dt.get_member(user_id)
-                                    await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` verified as {severity}. Gave {amount} XP to {member} ({user_id})')
+                                    await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` verified as {severity}. Gave {amount} XP to {member} (`{user_id}`)')
                                     break
                     await asyncio.sleep(1)
                 await asyncio.sleep(60)
@@ -198,8 +198,9 @@ class Experience:
         if purchase is not None:
             member = ctx.guild.get_member(purchase.hunter.id)
             em = discord.Embed()
-            em.title = f'Purchase Details (ID: {purchase_id})'
+            em.title = f'Purchase Details'
             em.colour = 7506394
+            em.set_footer(text=f'Purchase ID: {purchase_id}')
             em.add_field(name='User', value=f'{member} ({member.id})', inline=False)
             em.add_field(name='Item', value=f'{purchase.item.name}', inline=False)
             em.add_field(name='Bought', value=f'{purchase.timestamp.strftime("%Y-%m-%d %H:%M:%S")}', inline=False)
@@ -262,13 +263,16 @@ class Experience:
         except InsufficientBalanceError as e:
             return await ctx.send(Configuration.get_var('strings', 'STORE_NEED_MORE_XP').format(xp=e))
         prize_log = Configuration.get_channel('PRIZE_LOG')
-        await prize_log.send(f':shopping_cart: {ctx.author} ({ctx.author.id}) bought {purchase.item.name} (Purchase ID: {purchase.id})')
-        expiry = ''
+        await prize_log.send(f':shopping_cart: {ctx.author} (`{ctx.author.id}`) bought {purchase.item.name} (Purchase ID: {purchase.id})')
+        em = discord.Embed(title='Purchase Details', colour=7386009)
+        em.set_footer(text=f'Purchase ID: {purchase.id}')
+        em.add_field(name='Item', value=purchase.item.name)
+        em.add_field(name='Bought', value=purchase.timestamp.strftime('%Y-%m-%d %H:%M:%S'))
         if purchase.item.expires_after is not None:
-            expiry = f'\nExpires: {(purchase.timestamp + timedelta(seconds=purchase.item.expires_after)).strftime("%Y-%m-%d %H:%M:%S")}'
-        receipt = f'```Item: {purchase.item.name}\nDate/Time: {purchase.timestamp.strftime("%Y-%m-%d %H:%M:%S")}\nPurchase ID: {purchase.id}{expiry}```'
+            em.add_field(name='Expires', value=(purchase.timestamp + timedelta(seconds=purchase.item.expires_after)).strftime('%Y-%m-%d %H:%M:%S'))
         if purchase.item.physical:
-            await ctx.send(Configuration.get_var('strings', 'STORE_PHYSICAL').format(receipt=receipt))
+            em.description = Configuration.get_var('strings', 'STORE_PHYSICAL')
+            await ctx.send(embed=em)
         else:
             if purchase.item.role_id is not None:
                 dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
@@ -276,16 +280,18 @@ class Experience:
                 try:
                     await member.add_roles(discord.Object(id=purchase.item.role_id), reason=f'Store purchase (ID: {purchase.id})')
                 except (discord.Forbidden, discord.HTTPException):
-                    await BugBotLogging.bot_log(f':warning: Unable to add {purchase.item.name} role purchase to {ctx.author} ({ctx.author.id})')
-                    await ctx.send(Configuration.get_var('strings', 'STORE_ROLE_ERROR'))
+                    await BugBotLogging.bot_log(f':warning: Unable to add {purchase.item.name} role purchase (ID: {purchase.id}) to {ctx.author} (`{ctx.author.id}`)')
+                    await ctx.send(Configuration.get_var('strings', 'STORE_ROLE_ERROR').format(purchase=purchase))
                     raise
                 else:
-                    await ctx.send(Configuration.get_var('strings', 'STORE_ROLE').format(receipt=receipt))
-                    await BugBotLogging.bot_log(f':shopping_cart: Applied {purchase.item.name} role to {ctx.author} ({ctx.author.id})')
+                    em.description = Configuration.get_var('strings', 'STORE_ROLE')
+                    await ctx.send(embed=em)
+                    await BugBotLogging.bot_log(f':shopping_cart: Applied {purchase.item.name} role to {ctx.author} (`{ctx.author.id}`)')
                     if not ExpUtils.fulfil_purchase(purchase.id):
                         await BugBotLogging.bot_log(f':warning: Failed to mark purchase ID {purchase.id} as fulfilled')
             else:
-                await ctx.send(Configuration.get_var('strings', 'STORE_DIGITAL').format(receipt=receipt))
+                em.description = Configuration.get_var('strings', 'STORE_DIGITAL')
+                await ctx.send(embed=em)
 
     @commands.command(aliases=['givexp', 'addxp'])
     @Checks.is_employee()
@@ -294,7 +300,7 @@ class Experience:
             await ctx.send('XP amount cannot be less than 1')
         else:
             balance = ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
-            await BugBotLogging.bot_log(f':moneybag: {ctx.author} gave {amount} XP to {user} ({user.id}). Their new balance is {balance} XP')
+            await BugBotLogging.bot_log(f':moneybag: {ctx.author} gave {amount} XP to {user} (`{user.id}`). Their new balance is {balance} XP')
             await ctx.send(f'Gave {amount} XP to {user}. New balance is {balance} XP', delete_after=5.0)
         try:
             await ctx.message.delete()
@@ -308,7 +314,7 @@ class Experience:
             await ctx.send('XP amount cannot be less than 1')
         else:
             balance = ExpUtils.remove_xp(user.id, amount, ctx.author.id, TransactionEvent.xp_taken)
-            await BugBotLogging.bot_log(f':moneybag: {ctx.author} removed {amount} XP from {user} ({user.id}). Their new balance is {balance} XP')
+            await BugBotLogging.bot_log(f':moneybag: {ctx.author} removed {amount} XP from {user} (`{user.id}`). Their new balance is {balance} XP')
             await ctx.send(f'Removed {amount} XP from {user}. New balance is {balance} XP', delete_after=5.0)
         try:
             await ctx.message.delete()
@@ -321,7 +327,7 @@ class Experience:
         amount = Configuration.get_var('bugbot', 'XP').get('REWARD')
         balance = ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
         if balance is not None:
-            await BugBotLogging.bot_log(f':moneybag: {ctx.author} rewarded {user} ({user.id}) with {amount} XP. Their new balance is {balance} XP')
+            await BugBotLogging.bot_log(f':moneybag: {ctx.author} rewarded {user} (`{user.id}`) with {amount} XP. Their new balance is {balance} XP')
             await ctx.send(f':ok_hand: {user} received some XP for helping out!', delete_after=5.0)
         else:
             await ctx.send(f'{user} is not recognised as a Bug Hunter', delete_after=5.0)
