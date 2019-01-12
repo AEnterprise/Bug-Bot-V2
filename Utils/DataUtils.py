@@ -91,6 +91,16 @@ class Transaction(Model):
         database = connection
 
 
+class Storeinfo(Model):
+    id = PrimaryKeyField()
+    userid = BigIntegerField() # The user ID
+    platform = EnumField(Platforms)
+    information = CharField(max_length=100, default="Not set", collation="utf8mb4_general_ci")
+
+    class Meta:
+        database = connection
+
+
 class StoreItem(Model):
     id = PrimaryKeyField()
     name = CharField(collation="utf8mb4_general_ci")
@@ -120,5 +130,6 @@ class Purchase(Model):
 
 def init():
     connection.connect()
-    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, StoreItem, Purchase])
+    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase])
     connection.close()
+
