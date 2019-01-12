@@ -7,3 +7,5 @@ config/master.json
 known_messages.json
 logs/*
 config/master.yaml
+config/bugbot.yaml
+config/strings.yaml

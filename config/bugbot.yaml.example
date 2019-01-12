@@ -1,0 +1,64 @@
+INITIATE_PHRASE: cereal is a soup
+DAILY_XP_LIMITS:
+  QUEUE_REPRO: 5
+  CANREPRO: 3
+XP:
+  QUEUE_REPRO: 5
+  CANREPRO: 3
+  REWARD: 3
+  DEAD_BUG: 5
+  VERIFIED_BUG: 15
+TRELLO:
+  NEW_LISTS:
+    - 5bc7b74a1645f21e294191e7 #Store - User Reported Bugs
+    - 5846f9f1c7b3c505ea4a56be #Linux - User Reported
+    - 57f2a30d861fa9b5816c9717 #Android - User Reported Bugs
+    - 57fd4af58042f56c271d46b3 #iOS - New Issues
+    - 5771677fda45a436c5b8d255 #Desktop - User Reported Bugs
+  DEAD_BUG_LISTS:
+    - 5bce410f7bbb6343675cb496 #Store - Dead Bugs
+    - 5bf4c065c59169111a5aff6e #Store - Cannot Reproduce
+    - 5a038024570d1bb7bcb88470 #Linux - Cannot Reproduce
+    - 5846fa1e4aa5027f8159c18c #Linux - Won't Fix/Not a Bug
+    - 57f2a75720700abeabcc305f #Android - Won't Fix
+    - 58064b37e4c51a85d6d0b68e #Android - Cannot Reproduce
+    - 57f3de4c7074898c49b0b36e #iOS - Won't Fix
+    - 580e8083de3bfbcd4de2ecb9 #iOS - Cannot Reproduce
+    - 5b0609fc06bd61f148dc5293 #iOS - Not a Bug
+    - 5771678de6092759049c939f #Desktop - Cannot Reproduce
+    - 57d19c9d9c34060a61b95f57 #Desktop - Won't Fix. Dead Bug
+    - 580e822c24ce2ffdd624a43c #Desktop - Not a Bug
+  PRIORITIES:
+    P0:
+      XP_BONUS: 20
+      LABELS:
+        - 5771673884e677fd364b7224 #Desktop
+        - 57f2d33384e677fd36abfafe #iOS
+        - 5846f7fd84e677fd36a40d72 #Linux
+        - 5bc7b4ada724a908c039fa29 #Store
+        - 57f2a30684e677fd36ab30e7 #Android
+    P1:
+      XP_BONUS: 15
+      LABELS:
+        - 5771673884e677fd364b7223 #Desktop
+        - 57f2d33384e677fd36abfafb #iOS
+        - 5846f7fd84e677fd36a40d71 #Linux
+        - 5bd2a46d6e23e034c34690fe #Store
+        - 57f2a30684e677fd36ab30e6 #Android
+    P2:
+      XP_BONUS: 10
+      LABELS:
+        - 5771673884e677fd364b7222 #Desktop
+        - 57f2d33384e677fd36abfafa #iOS
+        - 5846f7fd84e677fd36a40d70 #Linux
+        - 5bce4dec7298fb31e9326cce #Store
+        - 57f2a30684e677fd36ab30e5 #Android
+    P3:
+      XP_BONUS: 5
+      LABELS:
+        - 5771673884e677fd364b7221 #Desktop
+        - 57f2d33384e677fd36abfaf9 #iOS
+        - 5846f7fd84e677fd36a40d6f #Linux
+        - 5bce4a2f5a061a6f72dad6be #Store
+        - 57f2a30684e677fd36ab30e4 #Android
+        - 5af202d4885b60489848e72d #Android (P4)

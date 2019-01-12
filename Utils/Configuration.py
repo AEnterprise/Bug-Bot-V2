@@ -4,6 +4,7 @@ from Utils import BugBotLogging
 
 MASTER_CONFIG = dict()
 MASTER_LOADED = False
+CONFIGS = dict()
 BOT = None
 
 
@@ -41,6 +42,25 @@ def save_master():
     global MASTER_CONFIG
     with open('config/master.yaml', 'w') as yamlfile:
         yaml.dump(MASTER_CONFIG, yamlfile, default_flow_style=False)
+
+
+def load_config(filename):
+    try:
+        with open(f'config/{filename}', 'r') as yamlfile:
+            return yaml.safe_load(yamlfile)
+    except FileNotFoundError:
+        BugBotLogging.error(f'Unable to load config/{filename}')
+    except yaml.YAMLError:
+        BugBotLogging.error(f'Unable to parse config/{filename}')
+        raise
+
+
+def get_var(group, key):
+    global CONFIGS
+    group = group.lower()
+    if group not in CONFIGS:
+        CONFIGS[group] = load_config(f'{group}.yaml')
+    return CONFIGS[group].get(key, None)
 
 
 def get_role(name):
