@@ -41,6 +41,14 @@ class TrelloUtils:
         ep = f'/cards/{card_id}'
         return await self._request(ep)
 
+    # Gets data for a batch of cards (max 10)
+    async def batch_get_cards(self, card_ids):
+        ep = '/batch'
+        payload = {
+            'urls': ','.join([f'/cards/{card_id}' for card_id in card_ids])
+        }
+        return await self._request(ep, payload)
+
     # Edit the title (short description) and/or content (everything else) on a card
     async def edit_card(self, id, title=None, content=None):
         ep = f'/cards/{id}'
@@ -97,7 +105,7 @@ class TrelloUtils:
         return res['id']
 
     # Edit a comment using the card ID and action/comment ID (returned when creating the comment)
-    async def edit_comment(self, card_id, action_id):
+    async def edit_comment(self, card_id, action_id, comment):
         ep = f'/cards/{card_id}/actions/{action_id}/comments'
         res = await self._request(ep, {'text': comment}, 'PUT')
         return res['id']

@@ -4,7 +4,7 @@ from peewee import MySQLDatabase, Model, PrimaryKeyField, CharField, IntegerFiel
     ForeignKeyField, DateTimeField, Check, SmallIntegerField
 
 from Utils import Configuration
-from Utils.Enums import Platforms, BugState, BugInfoType, TransactionEvent
+from Utils.Enums import Platforms, BugState, BugInfoType, TransactionEvent, ReportSource
 
 db_info = Configuration.get_master_var("DATABASE")
 connection = MySQLDatabase(db_info["NAME"], user=db_info["USER"], password=db_info["PASSWORD"], host=db_info["HOST"],
@@ -35,11 +35,15 @@ class Bug(Model):
     device_info = CharField(collation="utf8mb4_general_ci")
     platform = EnumField(Platforms)
     blocked = BooleanField(default=False)
-    state = EnumField(BugState, default=0)
+    state = EnumField(BugState, default=BugState.queued)
     reported_at = DateTimeField(default=datetime.utcnow)
     xp_awarded = BooleanField(default=False)
     last_state_change = DateTimeField(default=datetime.utcnow)
     trello_id = CharField(max_length=30, null=True)
+    trello_list = CharField(max_length=30, null=True)
+    priority = SmallIntegerField(null=True)
+    msg_id = BigIntegerField(null=True)
+    source = EnumField(ReportSource)
 
     class Meta:
         database = connection
@@ -91,7 +95,45 @@ class Transaction(Model):
         database = connection
 
 
+class Storeinfo(Model):
+    id = PrimaryKeyField()
+    userid = BigIntegerField() # The user ID
+    platform = EnumField(Platforms)
+    information = CharField(max_length=100, default="Not set", collation="utf8mb4_general_ci")
+
+    class Meta:
+        database = connection
+
+
+class StoreItem(Model):
+    id = PrimaryKeyField()
+    name = CharField(collation="utf8mb4_general_ci")
+    cost = SmallIntegerField()
+    description = CharField(max_length=500, collation="utf8mb4_general_ci")
+    link = CharField(collation="utf8mb4_general_ci", null=True)
+    physical = BooleanField()
+    expires_after = IntegerField(null=True)
+    role_id = BigIntegerField(null=True)
+    in_stock = BooleanField(default=True)
+
+    class Meta:
+        database = connection
+
+
+class Purchase(Model):
+    id = PrimaryKeyField()
+    timestamp = DateTimeField(default=datetime.utcnow)
+    hunter = ForeignKeyField(BugHunter, backref="purchases")
+    item = ForeignKeyField(StoreItem, backref="purchases")
+    expired = BooleanField(default=False)
+    fulfilled = BooleanField(default=False)  # not currently used
+
+    class Meta:
+        database = connection
+
+
 def init():
     connection.connect()
-    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction])
+    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase])
     connection.close()
+

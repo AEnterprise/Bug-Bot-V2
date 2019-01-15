@@ -6,6 +6,7 @@ COGS:
   - Announcement
   - BugHunter
   - Moderation
+  - Experience
   - BugReporting
 ROLES:
   BUG_HUNTER: 1342
@@ -25,17 +26,15 @@ CHANNELS:
   BUG_HUNTER: 1324
   MODINATOR: 1234
   EMPLOYEE: 1234
+  PRIZE_LOG: 1234
+EMOJI:
+  MEOWBUGHUNTER: 428620496758636604
+  ANDROID: 332598085782077451
+  APPROVE: 1234
+  DENY: 1234
 TRELLO_KEY: xyz123
 TRELLO_TOKEN: xyz123
 GUILD_ID: 411673927698350100
-INITIATE_PHRASE: cereal is a soup
-STRINGS:
-  BH_WELCOME: "Everyone, please welcome the newest addition to the Bug Hunter:tm:s, {tester.mention}! Make sure they feel the love! <:dabHeart:456143314312495125>"
-  WRONG_PHRASE: "Sorry, that's not the correct phrase. Just read carefully and you'll find it, I promise!"
-  INITIATE_TIME_TAKEN: "{tester} took {time} to find the secret phrase and is now a full Bug Hunter!"
-  NEW_INITIATE: "Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.\nOnce you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!"
-  LOCKDOWN_MESSAGE: "The bot is being restarted, and the bug reporting process has been put on hold temporarily."
-  NON_COMMANDS_MSG: "Hey {user} this channel is only for bot commands. If you need help with something, try reading <#342043548369158156> or <#342060723721207810>!"
 DATABASE:
   NAME: BugBot
   USER: BugBot

@@ -23,7 +23,7 @@ def escape_markdown(text):
 async def lockdown_shutdown(bot):
     for key in Configuration.get_master_var("BUGCHANNELS").items():
         channel = Configuration.get_bugchannel(key[0])
-        await channel.send(Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"))
+        await channel.send(Configuration.get_var("strings", "LOCKDOWN_MESSAGE"))
         g = bot.get_guild(Configuration.get_master_var("GUILD_ID"))
         r = g.get_role(Configuration.get_master_var("GUILD_ID"))
         overwrites_everyone = channel.overwrites_for(r)

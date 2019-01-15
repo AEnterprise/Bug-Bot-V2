@@ -22,7 +22,7 @@ async def restart_cleanup():
         channel = Configuration.get_bugchannel(key[0])
         async for message in channel.history(limit=1):
             if message.author.id == bugbot.user.id:
-                if message.content == Configuration.get_master_var("STRINGS").get("LOCKDOWN_MESSAGE"):
+                if message.content == Configuration.get_var("strings", "LOCKDOWN_MESSAGE"):
                     await message.delete()
         g = bugbot.get_guild(Configuration.get_master_var("GUILD_ID"))
         r = g.get_role(Configuration.get_master_var("GUILD_ID"))
