@@ -24,6 +24,11 @@ class BugInfoType(Enum):
     attachment = 3
 
 
+class ReportSource(Enum):
+    form = 0
+    command = 1
+
+
 class TransactionEvent(Enum):
     can_repro = 0
     cannot_repro = 1
@@ -39,3 +44,12 @@ class TransactionEvent(Enum):
     reward = 11
     xp_taken = 12
     purchase = 13
+
+
+class ReportError(Enum):
+    unknown_platform = 0
+    links_detected = 1
+    missing_fields = 2
+    missing_steps = 3
+    blacklisted_words = 4
+    length_exceeded = 5

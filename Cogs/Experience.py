@@ -52,12 +52,12 @@ class Experience:
                         card_id = card['shortLink']
                         # If the card was archived as new (i.e. approved dupe)
                         if card['closed'] and card['idList'] in Configuration.get_var('bugbot', 'TRELLO').get('NEW_LISTS'):
-                            ExpUtils.award_bug_xp(b[card_id], 0, self.bot.user.id)
+                            ExpUtils.award_bug_xp(b[card_id], 0, self.bot.user.id, card['idList'])
                             await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` was archived during verification')
                         # If the card is in one of the dead bug/won't fix/CNR lists
                         elif card['idList'] in Configuration.get_var('bugbot', 'TRELLO').get('DEAD_BUG_LISTS'):
                             amount = Configuration.get_var('bugbot', 'XP').get('DEAD_BUG')
-                            user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id)
+                            user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id, card['idList'])
                             member = dt.get_member(user_id)
                             await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` marked as dead. Gave {amount} XP to {member} (`{user_id}`)')
                         else:
@@ -65,7 +65,8 @@ class Experience:
                             for severity, data in Configuration.get_var('bugbot', 'TRELLO').get('PRIORITIES').items():
                                 if any([x for x in card['labels'] if x['id'] in data['LABELS']]):
                                     amount = Configuration.get_var('bugbot', 'XP').get('VERIFIED_BUG') + data['XP_BONUS']
-                                    user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id)
+                                    priority = int(severity[-1])
+                                    user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id, card['idList'], priority)
                                     member = dt.get_member(user_id)
                                     await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` verified as {severity}. Gave {amount} XP to {member} (`{user_id}`)')
                                     break

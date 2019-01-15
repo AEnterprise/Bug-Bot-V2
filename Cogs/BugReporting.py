@@ -1,11 +1,12 @@
+import re
 import asyncio
 
 import discord
 from discord.ext import commands
 
-from Utils import BugBotLogging, Configuration, Utils
-from Utils.DataUtils import Storeinfo
-from Utils.Enums import Platforms
+from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
+from Utils.DataUtils import Storeinfo, Bug
+from Utils.Enums import Platforms, ReportSource, ReportError
 
 
 def platform_convert(platform):
@@ -20,10 +21,17 @@ def platform_convert(platform):
     elif platform.lower() == '-a':
         return [Platforms.android, '-a']
 
+
+class BugReportException(Exception):
+    def __init__(self, code, msg=''):
+        super().__init__(msg)
+        self.code = code
+        self.msg = msg
+
+
 class BugReporting:
     def __init__(self, bot):
         self.bot = bot
-
 
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:
@@ -159,6 +167,183 @@ class BugReporting:
                 return await self._forbidden_msg(ctx)
             if ctx.guild is not None:
                 await ctx.message.delete()
+
+    async def process_web_report(self, data):
+        pass
+
+    def build_report_embed(self, data):
+        em = discord.Embed(colour=data['platform']['colour'])
+        if 'lock' in data:
+            mod = data['lock']['username']
+            reason = data['lock']['reason']
+            em.description = f':lock: This report has been temporarily locked by {mod} and cannot be interacted with (`{reason}`)'
+        em.add_field(name='Submitter', value=f'{data["submitter"]["username"]} (`{data["submitter"]["id"]}`) {data["submitter"]["emoji"]}', inline=False)
+        em.add_field(name='Platform', value=f'{data["platform"]["name"]} {data["platform"]["emoji"]}', inline=False)
+        em.add_field(name='Short Description', value=data['title'], inline=False)
+        em.add_field(name='Steps to Reproduce', value=data['steps'], inline=False)
+        em.add_field(name='Expected Result', value=data['expected'], inline=False)
+        em.add_field(name='Actual Result', value=data['actual'], inline=False)
+        em.add_field(name='Client Info', value=data['client'], inline=True)
+        em.add_field(name='Device/System Info', value=data['system'], inline=True)
+        em.add_field(name='Report ID', value=f'**{data["id"]}**', inline=False)
+
+        interactions = []
+        for x in reversed(data['repros']):
+            if x['type'] == 'approve':
+                emoji = Emoji.get_chat_emoji('APPROVE')
+            elif x['type'] == 'deny':
+                emoji = Emoji.get_chat_emoji('DENY')
+            elif x['type'] == 'note':
+                emoji = ':pencil:'
+            interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): `{x["details"]}`')
+        for x in data['attachments']:
+            interactions.append(f':paperclip: **{x["username"]}** (`{x["id"]}`): {x["link"]}')
+
+        if len(interactions) > 0:
+            em.add_field(name='---', value='\n'.join(interactions), inline=False)
+
+        return em
+
+        '''
+        EXAMPLE FORMAT:
+        {
+            "platform": {
+                "name": "iOS",
+                "colour": 10460830,
+                "emoji": ":iphone:"
+            },
+            "submitter": {
+                "username": "Test#1234",
+                "id": 258274103935369219,
+                "emoji": "<:meowbughunter:533815499541184532>"
+            },
+            "id": 13883,
+            "title": "",
+            "steps": "1. This is a step\n2. Another step",
+            "expected": "",
+            "actual": "",
+            "client": "",
+            "system": "",
+            "repros": [
+                {
+                    "username": "Test#1234",
+                    "id": 258274103935369219,
+                    "type": "approve",
+                    "details": "Can repro..."
+                }
+            ],
+            "lock": {
+                "username": "Test#1234",
+                "reason": "Checking with devs"
+            },
+            "attachments": [
+                {
+                    "username": "Test#1234",
+                    "id": 258274103935369219,
+                    "link": ""
+                }
+            ]
+        }
+        '''
+
+    async def add_report(self, user, platform, report, source):
+
+        # Check the platform is valid (or can be aliased)
+        platforms = Configuration.get_var('bugbot', 'BUG_PLATFORMS')
+        platform_data = platforms.get(platform.upper(), None)
+        if platform_data is None:
+            for p, pd in platforms.items():  # TODO: Squash this
+                if platform.lower() in pd['ALIASES']:
+                    platform = p
+                    platform_data = pd
+                    break
+        if platform_data is None:
+            raise BugReportException(ReportError.unknown_platform)
+
+        # Escape markdown in report text
+        report = Utils.escape_markdown(report)
+
+        # Check for links/invites in the report (exclude trello.com)
+        if re.search(r'(discordapp\.com/invite|discord\.gg|(ftp|https?)://(?!trello\.com)\S+)', report, re.IGNORECASE):
+            raise BugReportException(ReportError.links_detected)
+
+        # Check all required fields are present
+        groups = re.match(r'(?P<title>.*)\s\|\sSteps\sto\sReproduce:(?P<steps>.*)\sExpected\sResult:\s(?P<expected>.*)\sActual\sResult:\s(?P<actual>.*)\sClient\sSettings:\s(?P<client>.*)\sSystem\sSettings:\s(?P<system>.*)', report, re.IGNORECASE)
+        if not groups:
+            raise BugReportException(ReportError.missing_fields)
+
+        # Split text into fields and parse where necessary (e.g. steps)
+        sections = groups.groupdict()
+        steps = sections['steps'].split(' - ')
+        if len(steps) < 2:
+            raise BugReportException(ReportError.missing_steps)
+        del steps[0]
+        sections['steps'] = '\n'.join([f'{idx + 1}. {step}' for idx, step in enumerate(steps)])
+
+        # Check for blacklisted words in title/actual result
+        blacklist = [x for x in Configuration.get_var('bugbot', 'BUG_TEXT_BLACKLIST') if x in sections['title'].lower() or x in sections['actual'].lower()]  # FIXME: This matches within words so will catch 'buggy'...etc
+        if len(blacklist) > 0:
+            raise BugReportException(ReportError.blacklisted_words, ', '.join(blacklist))
+
+        # Check length of each section doesn't exceed field length
+        if any([x for x in sections.values() if len(x) >= 2000]):
+            raise BugReportException(ReportError.length_exceeded)
+
+        # Add report to database and get report ID
+        bug = Bug.create(
+            reporter=user.id,
+            title=sections['title'],
+            steps=sections['steps'],
+            expected=sections['expected'],
+            client_info=sections['client'],
+            device_info=sections['system'],
+            platform=Platforms[platform.lower()],
+            source=source
+        )
+
+        # Build embed
+        report = {'id': bug.id, 'repros': [], 'attachments': []}
+        report.update(sections)
+        report['submitter'] = {'username': str(user), 'id': user.id, 'emoji': ''}
+        if hasattr(user, 'roles'):
+            if Configuration.get_role('BUG_HUNTER') in user.roles:
+                report['submitter']['emoji'] = Emoji.get_chat_emoji('MEOWBUGHUNTER')
+        if not platform_data['EMOJI'].startswith(':'):
+            platform_data['EMOJI'] = Emoji.get_chat_emoji(platform_data['EMOJI'])
+        report['platform'] = {'name': platform_data['DISPLAY'], 'colour': platform_data['COLOUR'], 'emoji': platform_data['EMOJI']}
+        em = self.build_report_embed(report)
+
+        # Post embed in queue and get message ID
+        queue = self.bot.get_channel(Configuration.get_master_var('BUGCHANNELS')['QUEUE'])
+        msg = await queue.send(embed=em)
+
+        # Update database entry with message ID
+        bug.msg_id = msg.id
+        bug.save()
+
+        # Return the report ID
+        return bug.id
+
+    @commands.command()
+    #@Checks.dm_only()  # For easier testing
+    async def submit(self, ctx: commands.Context, platform: str, *, report_str: str):
+        dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
+        member = dt.get_member(ctx.author.id)
+        try:
+            report_id = await self.add_report(member, platform, report_str, ReportSource.command)
+        except BugReportException as e:
+            response = Configuration.get_var('strings', e.code.name.upper())
+            if response is not None:
+                if e.code == ReportError.blacklisted_words:
+                    response = response.format(terms=e.msg)
+                response = f'{ctx.author.mention}, {response}'
+            else:
+                response = e.code.name
+            await ctx.send(response)
+        else:
+            await BugBotLogging.bot_log(f':clipboard: {ctx.author} ({ctx.author.id}) submitted a new report ({report_id})')
+            await ctx.send(Configuration.get_var('strings', 'REPORT_SUBMITTED').format(user=ctx.author))
+
 
 def setup(bot):
     bot.add_cog(BugReporting(bot))
