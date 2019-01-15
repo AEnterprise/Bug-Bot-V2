@@ -8,7 +8,7 @@
             } elseif (isset($_GET["code"])) {
                 Header("Location: login.php?code={$_GET["code"]}");
             } else {
-                Header("Location: https://discordapp.com/oauth2/authorize?client_id=".$configs->client_id."&response_type=code&scope=identify");
+                Header("Location: https://discordapp.com/oauth2/authorize?client_id=".$configs->client_id."&response_type=code&scope=identify%20guilds");
             }
 ?>
 <!DOCTYPE html>
