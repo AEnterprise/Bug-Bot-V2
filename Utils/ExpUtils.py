@@ -70,11 +70,14 @@ def get_xp_pending_bugs():
             .where(reduce(operator.and_, clauses)))        
 
 
-def award_bug_xp(bug_id, amount, bot_id):
+def award_bug_xp(bug_id, amount, bot_id, trello_list, priority=None):
     bug = Bug.get_by_id(bug_id)
     if amount > 0:
         add_xp(bug.reporter, amount, bot_id, TransactionEvent.bug_verified)
     bug.xp_awarded = True
+    bug.trello_list = trello_list
+    if priority is not None:
+        bug.priority = priority
     bug.save()
     return bug.reporter
 

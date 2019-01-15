@@ -8,6 +8,49 @@ XP:
   REWARD: 3
   DEAD_BUG: 5
   VERIFIED_BUG: 15
+BUG_PLATFORMS:
+  DESKTOP:
+    ALIASES:
+      - desktop
+      - windows
+      - mac
+    COLOUR: 30935
+    DISPLAY: Desktop
+    EMOJI: ":desktop:"
+  LINUX:
+    ALIASES:
+      - linux
+    COLOUR: 14501908
+    DISPLAY: Linux
+    EMOJI: ":penguin:"
+  IOS:
+    ALIASES:
+      - ios
+      - iphone
+    COLOUR: 10460830
+    DISPLAY: iOS
+    EMOJI: ":iphone:"
+  ANDROID:
+    ALIASES:
+      - android
+    COLOUR: 10798649
+    DISPLAY: Android
+    EMOJI: "ANDROID"
+  STORE:
+    ALIASES:
+      - store
+    COLOUR: 7506394
+    DISPLAY: Discord Store
+    EMOJI: ":moneybag:"
+  MARKETING:
+    ALIASES:
+      - marketing
+    COLOUR: 2895667
+    DISPLAY: Marketing Sites
+    EMOJI: ":spider_web:"
+BUG_TEXT_BLACKLIST:
+  - glitch
+  - bug
 TRELLO:
   NEW_LISTS:
     - 5bc7b74a1645f21e294191e7 #Store - User Reported Bugs
@@ -22,6 +65,7 @@ TRELLO:
     - 5846fa1e4aa5027f8159c18c #Linux - Won't Fix/Not a Bug
     - 57f2a75720700abeabcc305f #Android - Won't Fix
     - 58064b37e4c51a85d6d0b68e #Android - Cannot Reproduce
+    - 5c3ab3f187e3ac3e1e0a0499 #Android - Not a Bug
     - 57f3de4c7074898c49b0b36e #iOS - Won't Fix
     - 580e8083de3bfbcd4de2ecb9 #iOS - Cannot Reproduce
     - 5b0609fc06bd61f148dc5293 #iOS - Not a Bug
