@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import discord
 from peewee import fn, IntegrityError
 
+from Utils import Configuration, BugBotLogging
 from Utils.Enums import TransactionEvent, BugState
 from Utils.DataUtils import Bug, BugHunter, Transaction, StoreItem, Purchase
 
@@ -67,19 +68,44 @@ def get_xp_pending_bugs():
     ]
     return (Bug
             .select()
-            .where(reduce(operator.and_, clauses)))        
+            .where(reduce(operator.and_, clauses)))
 
 
-def award_bug_xp(bug_id, amount, bot_id, trello_list, priority=None):
-    bug = Bug.get_by_id(bug_id)
-    if amount > 0:
-        add_xp(bug.reporter, amount, bot_id, TransactionEvent.bug_verified)
-    bug.xp_awarded = True
-    bug.trello_list = trello_list
-    if priority is not None:
-        bug.priority = priority
-    bug.save()
-    return bug.reporter
+async def award_bug_xp(bot, trello_id, list_id=None, label_ids=[], archived=False):
+    bug = Bug.get_or_none(Bug.trello_id == trello_id)
+    if bug is None:
+        return
+    dt = bot.get_guild(Configuration.get_master_var('GUILD_ID'))
+    # If the card was archived as new (i.e. approved dupe)
+    if archived and list_id in Configuration.get_var('bugbot', 'TRELLO').get('NEW_LISTS'):
+        bug.xp_awarded = True
+        bug.trello_list = list_id
+        bug.save()
+        await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` was archived during verification')
+    # If the card is in one of the dead bug/won't fix/CNR lists
+    elif list_id in Configuration.get_var('bugbot', 'TRELLO').get('DEAD_BUG_LISTS'):
+        amount = Configuration.get_var('bugbot', 'XP').get('DEAD_BUG')
+        add_xp(bug.reporter, amount, bot.user.id, TransactionEvent.bug_verified)
+        bug.xp_awarded = True
+        bug.trello_list = list_id
+        bug.save()
+        member = dt.get_member(bug.reporter)
+        await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` marked as dead. Gave {amount} XP to {member} (`{bug.reporter}`)')
+    else:
+        # Loop through the priority label sets (P0 - P3)
+        for severity, data in Configuration.get_var('bugbot', 'TRELLO').get('PRIORITIES').items():
+            if any([x for x in label_ids if x in data['LABELS']]):
+                amount = Configuration.get_var('bugbot', 'XP').get('VERIFIED_BUG') + data['XP_BONUS']
+                priority = int(severity[-1])
+                add_xp(bug.reporter, amount, bot.user.id, TransactionEvent.bug_verified)
+                bug.xp_awarded = True
+                bug.priority = priority
+                if list_id is not None:
+                    bug.trello_list = list_id
+                bug.save()
+                member = dt.get_member(bug.reporter)
+                await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` verified as {severity}. Gave {amount} XP to {member} (`{bug.reporter}`)')
+                break
 
 
 def expire_roles():

@@ -15,7 +15,7 @@ class Experience:
 
     def __init__(self, bot):
         self.bot = bot
-        self._bug_check = bot.loop.create_task(self.process_bug_xp())
+        self._bug_check = bot.loop.create_task(self.check_unverified_cards())
         self._expiry_check = bot.loop.create_task(self.check_expiry())
         Pages.register('store', self.init_store, self.update_store)
 
@@ -24,8 +24,7 @@ class Experience:
         self._expiry_check.cancel()
         Pages.unregister('store')
 
-    async def process_bug_xp(self):
-        # TODO: Eventually need something to consume Trello webhooks (polling for now)
+    async def check_unverified_cards(self):
         try:
             while not self.bot.is_closed():
                 # Get bugs that need to be verified
@@ -40,7 +39,6 @@ class Experience:
                         batch = {}
                 if len(batch) > 0:
                     batches.append(batch)
-                dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
                 for b in batches:
                     # Get card data from Trello for this batch
                     cards = await self.bot.trello.batch_get_cards(b.keys())
@@ -49,34 +47,14 @@ class Experience:
                             await BugBotLogging.bot_log(f':warning: Error with batch call on card ID {b.keys()[idx]}: {c["message"]} ({c["statusCode"]})')
                             continue
                         card = c['200']
-                        card_id = card['shortLink']
-                        # If the card was archived as new (i.e. approved dupe)
-                        if card['closed'] and card['idList'] in Configuration.get_var('bugbot', 'TRELLO').get('NEW_LISTS'):
-                            ExpUtils.award_bug_xp(b[card_id], 0, self.bot.user.id, card['idList'])
-                            await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` was archived during verification')
-                        # If the card is in one of the dead bug/won't fix/CNR lists
-                        elif card['idList'] in Configuration.get_var('bugbot', 'TRELLO').get('DEAD_BUG_LISTS'):
-                            amount = Configuration.get_var('bugbot', 'XP').get('DEAD_BUG')
-                            user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id, card['idList'])
-                            member = dt.get_member(user_id)
-                            await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` marked as dead. Gave {amount} XP to {member} (`{user_id}`)')
-                        else:
-                            # Loop through the priority label sets (P0 - P3)
-                            for severity, data in Configuration.get_var('bugbot', 'TRELLO').get('PRIORITIES').items():
-                                if any([x for x in card['labels'] if x['id'] in data['LABELS']]):
-                                    amount = Configuration.get_var('bugbot', 'XP').get('VERIFIED_BUG') + data['XP_BONUS']
-                                    priority = int(severity[-1])
-                                    user_id = ExpUtils.award_bug_xp(b[card_id], amount, self.bot.user.id, card['idList'], priority)
-                                    member = dt.get_member(user_id)
-                                    await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{card_id}` verified as {severity}. Gave {amount} XP to {member} (`{user_id}`)')
-                                    break
+                        await ExpUtils.award_bug_xp(self.bot, card['shortLink'], card['idList'], [x['id'] for x in card['labels']], card['closed'])
                     await asyncio.sleep(1)
-                await asyncio.sleep(60)
+                await asyncio.sleep(21600)
         except asyncio.CancelledError:
             pass
         except discord.ConnectionClosed:
             self._bug_check.cancel()
-            self._bug_check = self.bot.loop.create_task(self.process_bug_xp())
+            self._bug_check = self.bot.loop.create_task(self.check_unverified_cards())
 
     async def check_expiry(self):
         try:
