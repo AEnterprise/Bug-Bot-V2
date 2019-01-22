@@ -11,6 +11,25 @@ routes = web.RouteTableDef()
 replies = dict()
 
 
+def is_trello_ip(ip):
+    return ip in ['107.23.104.115', '107.23.149.70', '54.152.166.250', '54.164.77.56', '54.209.149.230']
+
+
+@routes.head('/BugBot/trello')
+@routes.post('/BugBot/trello')
+async def trello(request):
+    remote_ip = request.remote
+    if remote_ip == '127.0.0.1':
+        remote_ip = request.headers['X-Forwarded-For']  # For local testing with ngrok
+    if not is_trello_ip(remote_ip):
+        return web.Response(status=403)
+    # TODO: Could also verify the signature
+    if request.method == 'POST':
+        data = await request.json()
+        await request.app.redis.send('trello', data['action'])
+    return web.Response()
+
+
 @routes.post('/BugBot/reports')
 async def hello(request):
     # retrieve data:
@@ -45,7 +64,7 @@ async def hello(request):
 
     else:
         # send it to the bot for final processing
-        await RedisListener.send(data)
+        await request.app.redis.send('web_to_bot', data)
         reply = None
         # wait for the bot to process the report, up to 5 seconds
         for i in range(50):
@@ -63,12 +82,14 @@ async def hello(request):
 
 
 async def initialize(app):
-    #TODO: error proper logging
-    await RedisListener.initialize(app.loop, "bot_to_web", "web_to_bot", receive_reply, print)
+    # TODO: error proper logging
+    app.redis = RedisListener.Listener(app.loop)
+    await app.redis.initialize()
+    await app.redis.subscribe('bot_to_web', receive_reply, print)
 
 
 async def shutdown(app):
-    RedisListener.terminate()
+    await app.redis.terminate()
 
 
 async def receive_reply(reply):
