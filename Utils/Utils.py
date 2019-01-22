@@ -1,6 +1,7 @@
 import json
 from Utils import BugBotLogging, Configuration
 
+
 def fetch_from_disk(filename, alternative=None):
     try:
         with open(f"{filename}.json") as file:
@@ -10,15 +11,18 @@ def fetch_from_disk(filename, alternative=None):
             fetch_from_disk(alternative)
         return dict()
 
+
 def save_to_disk(filename, dict):
     with open(f"{filename}.json", "w") as file:
         json.dump(dict, file, indent=4, skipkeys=True, sort_keys=True)
+
 
 def escape_markdown(text):
     text = str(text)
     for c in ("\\", "`", "*", "_", "~", "<"):
         text = text.replace(c, f"\{c}\u200b")
     return text.replace("@", "@\u200b")
+
 
 async def lockdown_shutdown(bot):
     for key in Configuration.get_master_var("BUGCHANNELS").items():
@@ -35,11 +39,13 @@ async def lockdown_shutdown(bot):
             overwrites_everyone.send_messages = False
             await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot restart triggered.")
 
+
 async def cleanExit(bot, trigger):
     await BugBotLogging.bot_log(f"Shutdown triggered by {trigger}.")
+    await bot.redis.terminate()
     await bot.aiosession.close()
-    await bot.logout()
     await bot.close()
+
 
 def trim_message(message, limit):
     if len(message) < limit - 3:
