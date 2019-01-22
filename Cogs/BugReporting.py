@@ -30,10 +30,19 @@ def platform_convert(platform):
 class BugReporting:
     def __init__(self, bot):
         self.bot = bot
-        bot.loop.create_task(bot.redis.subscribe('web_to_bot', self.receive_report, BugBot.handle_exception))
-        bot.loop.create_task(bot.redis.subscribe('trello', self.process_trello_event, BugBot.handle_exception))
+        bot.loop.create_task(self.redis_init())
         bot.lockdown = False
         bot.lockdown_message = ""
+
+    async def redis_init(self):
+        if self.bot.redis:
+            BugBotLogging.info("Redis connection found, connecting and disabling dev submit command")
+            self.bot.remove_command("submit")
+            await self.bot.redis.subscribe('web_to_bot', self.receive_report, BugBot.handle_exception)
+            await self.bot.redis.subscribe('trello', self.process_trello_event, BugBot.handle_exception)
+        else:
+            BugBotLogging.warn("No redis connection found, leaving dev submit command in place for testing")
+
 
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:
@@ -175,18 +184,11 @@ class BugReporting:
 
     @commands.command()
     # @Checks.dm_only()  # For easier testing
-    async def submit(self, ctx: commands.Context, platform: str, *, report_str: str):
+    async def submit(self, ctx: commands.Context, platform: str, title, steps, expected, actual, client, system):
         dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
         member = dt.get_member(ctx.author.id)
         try:
-            # escape all markdown
-            report_str = Utils.escape_markdown(report_str)
-            groups = re.match(r'(?P<title>.*)\s\|\sSteps\sto\sReproduce:(?P<steps>.*)\sExpected\sResult:\s(?P<expected>.*)\sActual\sResult:\s(?P<actual>.*)\sClient\sSettings:\s(?P<client>.*)\sSystem\sSettings:\s(?P<system>.*)',
-                              report_str, re.IGNORECASE)
-            if not groups:
-                raise BugReportException(ReportError.missing_fields)
-            # Split text into fields and parse where necessary (e.g. steps)
-            sections = groups.groupdict()
+            sections = dict(title=title, steps=steps, expected=expected, actual=actual, client=client, system=system)
             steps = sections['steps'].split(' - ')
             del steps[0]
             sections['steps'] = '\n'.join([f'{idx + 1}. {step}' for idx, step in enumerate(steps)])

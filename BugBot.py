@@ -47,8 +47,12 @@ async def on_ready():
         DataUtils.init()
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
-        bugbot.redis = RedisListener.Listener(bugbot.loop)
-        await bugbot.redis.initialize()
+        try:
+            bugbot.redis = RedisListener.Listener(bugbot.loop)
+            await bugbot.redis.initialize()
+        except OSError:
+            # no redis present, set connection to none
+            bugbot.redis = None
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
             try:
