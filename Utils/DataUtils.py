@@ -31,6 +31,7 @@ class Bug(Model):
     title = CharField(collation="utf8mb4_general_ci")
     steps = CharField(max_length=2000, collation="utf8mb4_general_ci")
     expected = CharField(collation="utf8mb4_general_ci")
+    actual = CharField(collation="utf8mb4_general_ci")
     client_info = CharField(collation="utf8mb4_general_ci")
     device_info = CharField(collation="utf8mb4_general_ci")
     platform = EnumField(Platforms)
