@@ -45,6 +45,7 @@ class Bug(Model):
     priority = SmallIntegerField(null=True)
     msg_id = BigIntegerField(null=True)
     source = EnumField(ReportSource)
+    last_activity = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         database = connection
@@ -98,7 +99,7 @@ class Transaction(Model):
 
 class Storeinfo(Model):
     id = PrimaryKeyField()
-    userid = BigIntegerField() # The user ID
+    userid = BigIntegerField()  # The user ID
     platform = EnumField(Platforms)
     information = CharField(max_length=100, default="Not set", collation="utf8mb4_general_ci")
 
@@ -137,4 +138,3 @@ def init():
     connection.connect()
     connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase])
     connection.close()
-

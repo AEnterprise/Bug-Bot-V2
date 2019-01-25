@@ -12,10 +12,11 @@ from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisListener
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
+
 
 async def restart_cleanup():
     for key in Configuration.get_master_var("BUGCHANNELS").items():
@@ -35,6 +36,7 @@ async def restart_cleanup():
             overwrites_everyone.send_messages = True
             await channel.set_permissions(r, overwrite=overwrites_everyone, reason="Bot unlock after previous restart..")
 
+
 @bugbot.event
 async def on_ready():
     # load cogs upon startup
@@ -45,6 +47,12 @@ async def on_ready():
         DataUtils.init()
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
+        try:
+            bugbot.redis = RedisListener.Listener(bugbot.loop)
+            await bugbot.redis.initialize()
+        except OSError:
+            # no redis present, set connection to none
+            bugbot.redis = None
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
             try:
@@ -65,6 +73,7 @@ async def keepDBalive():
     while not bugbot.is_closed():
         DataUtils.connection.connection().ping(True)
         await asyncio.sleep(3600)
+
 
 @bugbot.event
 async def on_command_error(ctx: commands.Context, error):
@@ -111,6 +120,7 @@ def extract_info(o):
     else:
         info += str(o) + " "
     return info
+
 
 @bugbot.event
 async def on_error(event, *args, **kwargs):
