@@ -54,7 +54,7 @@ TRELLO_CANREPRO: |-
   {user}
 BUG_DENIED_QUEUE: "Report #{report_id} has been denied. You can read the denial reasons here: {jumplink}"
 BUG_DENIED_DM: |-
-  Hello! Your bug report #{report_id} has been denied. The following are the reasons given for the denial:
+  Hello! Your bug report `{title}` (#{report_id}) has been denied. The following are the reasons given for the denial:
     {reasons}
   You should try adding as much information as you can when you resubmit it. Here are some helpful tips:
   - Does your bug only happen on a specific version of the operating system?
