@@ -1,7 +1,9 @@
 BH_WELCOME: "Everyone, please welcome the newest addition to the Bug Hunter:tm:s, {tester.mention}! Make sure they feel the love! <:dabHeart:456143314312495125>"
 WRONG_PHRASE: "Sorry, that's not the correct phrase. Just read carefully and you'll find it, I promise!"
 INITIATE_TIME_TAKEN: "{tester} took {time} to find the secret phrase and is now a full Bug Hunter!"
-NEW_INITIATE: "Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.\nOnce you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!"
+NEW_INITIATE: |-
+  Congratulations! Your bug got approved and you're now just one step away from being a full-fledged Bug Hunter:tm:! All you need to do know is read through the <#322142516814282752> and find the Secret Phrase. You can find it by reading the charter thoroughly. There's no puzzle or trick, it states what the phrase is very clearly.
+  Once you find the secret phrase, just say it to me (this bot) right here in DMs and I'll let you know if it's right or not!
 LOCKDOWN_MESSAGE: "The bot is being restarted, and the bug reporting process has been put on hold temporarily."
 NON_COMMANDS_MSG: "Hey {user} this channel is only for bot commands. If you need help with something, try reading <#342043548369158156> or <#342060723721207810>!"
 STORE_ITEM_NOT_FOUND: "Unable to find an item with that ID"
@@ -13,8 +15,50 @@ STORE_ROLE: "Role added!"
 STORE_ROLE_ERROR: "Sorry, something went wrong while applying your purchased role. Please contact a Modinator for assistance (ID: {purchase.id})"
 MISSING_FIELDS: "your submission is missing one or more required fields. Please check out the form here: <link> for help writing your bug"
 BLACKLISTED_WORDS: "your submission has not yet gone through because you used the term(s): '{terms}' in your report. These types of words don't tell us what the problem is and lead to confusion. It also makes it really hard to find your bug later if someone else tries to report the same issue. Please try to be more descriptive and resubmit"
-REPORT_SUBMITTED: "your bug was successfully submitted and is now in the #bug-approval-queue!"
+REPORT_SUBMITTED: "{user.mention}, your bug was successfully submitted and is now in the #bug-approval-queue!"
 UNKNOWN_PLATFORM: "I didn't recognise that platform. Please check #bot-help for more info"
 LINKS_DETECTED: "your submission appears to contain links. Please remove these and inform a Bug Hunter after submitting your report if you need images/videos attached"
 MISSING_STEPS: "your submission is missing the steps to reproduce. Please check out the form here: <link> for help writing your bug"
 LENGTH_EXCEEDED: "your submission has one or more fields that exceed the character limit. Please try and rewrite any long sections to be more concise"
+APPROVE_ADDED: "{user.mention}, your approval has been added to the report!"
+DENY_ADDED: "{user.mention}, your deny has been added to the report"
+REVOKED_STANCE: "{user.mention}, you've removed your input on report {report_id}"
+STANCE_CHANGED: "{user.mention}, your stance has been updated"
+STANCE_TOO_LONG: "{user.mention}, your repro message is too long"
+NO_STANCE: "{user.mention}, you don't have a stance on report {report_id}"
+SELF_APPROVE_DISALLOWED: "{user.mention}, you aren't allowed to approve your own report"
+BUG_LOCKED: "{user.mention}, you aren't allowed to interact with this report"
+BUG_NOT_QUEUED: "{user.mention}, that report has already been moved from the queue"
+INVALID_REPORT_ID: "{user.mention}, I didn't recognise that report ID"
+STANCE_WRONG_CHANNEL: "{user.mention}, you can only use that command in the <#253923313460445184>!"
+BUG_APPROVED: "Congratulations! Your bug {trello_link} (report #{report_id}) has been approved! Don't forget to vote on the severity and have a great day!"
+TRELLO_CONTENT: |-
+  Reported by {reporter}
+  ###Steps to reproduce:
+  {bug.steps}
+  
+  ###Expected result:
+  {bug.expected}
+  ###Actual result:
+  {bug.actual}
+  ###Client settings:
+  {bug.client_info}
+  ###System settings:
+  {bug.device_info}
+  
+  Report ID: {bug.id}
+TRELLO_CANREPRO: |-
+  Can reproduce
+  {content}
+  
+  {user}
+BUG_DENIED_QUEUE: "Report #{report_id} has been denied. You can read the denial reasons here: {jumplink}"
+BUG_DENIED_DM: |-
+  Hello! Your bug report #{report_id} has been denied. The following are the reasons given for the denial:
+    {reasons}
+  You should try adding as much information as you can when you resubmit it. Here are some helpful tips:
+  - Does your bug only happen on a specific version of the operating system?
+  - Does your bug only happen on a specific device?
+  - Try to keep each repro step to a single action.
+
+  Thank you though for the report and we look forward to your next one! :thumbsup:

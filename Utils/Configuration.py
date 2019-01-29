@@ -66,6 +66,7 @@ def get_var(group, key):
 def get_role(name):
     return BOT.get_guild(get_master_var('GUILD_ID')).get_role(get_master_var("ROLES").get(name.upper(), None))
 
+
 def list_of_role_ids():
     list_of_ids = []
     for key in get_master_var("ROLES").items():
@@ -93,3 +94,7 @@ def get_channel(name):
 
 def get_bugchannel(name):
     return BOT.get_guild(get_master_var('GUILD_ID')).get_channel(get_master_var("BUGCHANNELS").get(name.upper(), None))
+
+
+def get_tester(id):
+    return BOT.get_guild(get_master_var('GUILD_ID')).get_member(id)

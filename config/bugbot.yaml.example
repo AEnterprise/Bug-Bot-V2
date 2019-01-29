@@ -6,8 +6,11 @@ XP:
   QUEUE_REPRO: 5
   CANREPRO: 3
   REWARD: 3
-  DEAD_BUG: 5
-  VERIFIED_BUG: 15
+  APPROVED_BUG: 5
+  VERIFIED_BUG: 10
+REQUIRED_STANCES:
+  APPROVE: 3
+  DENY: 3
 BUG_PLATFORMS:
   DESKTOP:
     ALIASES:
@@ -17,12 +20,14 @@ BUG_PLATFORMS:
     COLOUR: 30935
     DISPLAY: Desktop
     EMOJI: ":desktop:"
+    NEW_LIST: 5771677fda45a436c5b8d255
   LINUX:
     ALIASES:
       - linux
     COLOUR: 14501908
     DISPLAY: Linux
     EMOJI: ":penguin:"
+    NEW_LIST: 5846f9f1c7b3c505ea4a56be
   IOS:
     ALIASES:
       - ios
@@ -30,24 +35,28 @@ BUG_PLATFORMS:
     COLOUR: 10460830
     DISPLAY: iOS
     EMOJI: ":iphone:"
+    NEW_LIST: 57fd4af58042f56c271d46b3
   ANDROID:
     ALIASES:
       - android
     COLOUR: 10798649
     DISPLAY: Android
     EMOJI: "ANDROID"
+    NEW_LIST: 57f2a30d861fa9b5816c9717
   STORE:
     ALIASES:
       - store
     COLOUR: 7506394
     DISPLAY: Discord Store
     EMOJI: ":moneybag:"
+    NEW_LIST: 5bc7b74a1645f21e294191e7
   MARKETING:
     ALIASES:
       - marketing
     COLOUR: 2895667
     DISPLAY: Marketing Sites
     EMOJI: ":spider_web:"
+    NEW_LIST: xyz123
 BUG_TEXT_BLACKLIST:
   - glitch
   - bug
