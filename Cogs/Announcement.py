@@ -1,13 +1,34 @@
 import discord
 from discord.ext import commands
 
-from Utils import Configuration
+from Utils import BugBotLogging, Configuration
 from Utils import Checks
 
 
 class Announcement:
     def __init__(self,bot):
         self.bot = bot
+    
+    async def on_message(self, message):
+        if message.author.id == self.bot.user.id:
+            return
+        if message.channel.id not in Configuration.list_of_channels_ids():
+            return
+        if '<@&525464284759588866>' in message.content:
+            return
+        if '<@&524389656272437270>' in message.content:
+            role = Configuration.get_role("android")
+            await role.edit(mentionable=False)
+
+    
+    async def _announce_log(self, ctx, role):
+        await BugBotLogging.bot_log(f"{ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) pinged the **{role.name}** role!")
+    async def _announce_update_log(self, ctx, channel):
+        await BugBotLogging.bot_log(f"{ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) edited their announcement in **{channel}**.")
+    async def _role_mentionable(self, ctx, role):
+        await BugBotLogging.bot_log(f":exclamation: {ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) has made **{role.name}** mentionable!")
+    async def _role_unmentionable(self, ctx, role):
+        await BugBotLogging.bot_log(f":exclamation: {ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) has made **{role.name}** unmentionable!")
             
     @Checks.is_employee()
     @commands.bot_has_permissions(manage_roles=True)       
@@ -26,7 +47,9 @@ class Announcement:
         if message != None:
             await role.edit(mentionable=True)
             try:
-                await channel.send(f"{role.mention}\n{message}") 
+                await channel.send(f"{role.mention}\n{message}")
+                await self._announce_log(ctx, role) 
+                await ctx.send(f":ok_hand: I've pinged the **{role.name}** role for you!")
             except discord.Forbidden:
                 await ctx.send("I wasn't able to send a message in the announcement channel. Please check that I am able to talk.")
             await role.edit(mentionable=False)
@@ -51,10 +74,28 @@ class Announcement:
         if message != None:
             try:
                 await message.edit(content=f"{new_message}")
+                await self._announce_update_log(ctx, channel)
+                await ctx.send(f":ok_hand: I have updated the announcement made in {channel.mention} for you!") 
             except discord.Forbidden:
                 await ctx.send("it appears that my SEND_MESSAGES perms have been revoked and I cannot edit the message.")
         else:
             await ctx.send("I'm not really sure what you are trying to do.")
+
+    @Checks.is_employee()
+    @commands.bot_has_permissions(manage_roles=True)  
+    @commands.command()
+    async def mention(self, ctx: commands.Context, role_name):
+        role = Configuration.get_role(role_name)
+        if role is None:
+            return await ctx.send("This role may be either deleted or not configured properly.")
+        if role.mentionable:
+            await role.edit(mentionable=False)
+            await self._role_mentionable(ctx, role)
+            await ctx.send(f":ok_hand: I have made the **{role.name}** unmentionable for you.")
+        else:
+            await role.edit(mentionable=True)
+            await self._role_mentionable(ctx, role) 
+            await ctx.send(f":ok_hand: I have made the **{role.name}** mentionable for you.")
 
 def setup(bot):
     bot.add_cog(Announcement(bot))
