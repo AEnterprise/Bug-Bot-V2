@@ -29,6 +29,13 @@ class ReportSource(Enum):
     command = 1
 
 
+class BugBlockType(Enum):
+    none = 0
+    user = 1
+    mod = 2
+    flow = 3
+
+
 class TransactionEvent(Enum):
     can_repro = 0
     cannot_repro = 1
@@ -44,6 +51,7 @@ class TransactionEvent(Enum):
     reward = 11
     xp_taken = 12
     purchase = 13
+    bug_approved = 14
 
 
 class ReportError(Enum):

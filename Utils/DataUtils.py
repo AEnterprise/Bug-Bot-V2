@@ -4,7 +4,7 @@ from peewee import MySQLDatabase, Model, PrimaryKeyField, CharField, IntegerFiel
     ForeignKeyField, DateTimeField, Check, SmallIntegerField
 
 from Utils import Configuration
-from Utils.Enums import Platforms, BugState, BugInfoType, TransactionEvent, ReportSource
+from Utils.Enums import Platforms, BugState, BugInfoType, TransactionEvent, ReportSource, BugBlockType
 
 db_info = Configuration.get_master_var("DATABASE")
 connection = MySQLDatabase(db_info["NAME"], user=db_info["USER"], password=db_info["PASSWORD"], host=db_info["HOST"],
@@ -35,7 +35,9 @@ class Bug(Model):
     client_info = CharField(collation="utf8mb4_general_ci")
     device_info = CharField(collation="utf8mb4_general_ci")
     platform = EnumField(Platforms)
-    blocked = BooleanField(default=False)
+    block_type = EnumField(BugBlockType, default=BugBlockType.none)
+    block_reason = CharField(collation="utf8mb4_general_ci", null=True)
+    block_user = BigIntegerField(null=True)
     state = EnumField(BugState, default=BugState.queued)
     reported_at = DateTimeField(default=datetime.utcnow)
     xp_awarded = BooleanField(default=False)
@@ -58,7 +60,7 @@ class BugInfo(Model):
     bug = ForeignKeyField(Bug, backref="info")  # link to ticket
     type = EnumField(BugInfoType)
     added = DateTimeField(default=datetime.utcnow)
-    trello_id = CharField(max_length=30)
+    trello_id = CharField(max_length=30, null=True)
 
     class Meta:
         database = connection
