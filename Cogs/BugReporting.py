@@ -8,9 +8,11 @@ import discord
 from discord.ext import commands
 
 import BugBot
-from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji, RedisListener, ReportUtils, ExpUtils
-from Utils.DataUtils import Storeinfo, Bug, BugInfo
-from Utils.Enums import Platforms, ReportSource, ReportError, BugState, BugInfoType, TransactionEvent, BugBlockType
+from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpUtils
+
+from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
+from Utils.DataUtils import Storeinfo, Bug
+from Utils.Enums import Platforms, ReportSource, ReportError
 from Utils.ReportUtils import BugReportException
 from Utils.Trello import TrelloException
 
@@ -536,27 +538,6 @@ class BugReporting:
         await ctx.send(Configuration.get_var('strings', reply).format(user=ctx.author, report_id=report_id), delete_after=3.0)
         await asyncio.sleep(3)
         await ctx.message.delete()
-
-    async def receive_report(self, report):
-        # validation has already been done by the webserver so we don't need to bother doing that again here
-
-        # no reporting during lockdown
-        if self.bot.lockdown:
-            reply = dict(submitted=False, lockdown=True, message=self.bot.lockdown_message)
-            await self.bot.redis.send('bot_to_web', reply)
-        else:
-            user = self.bot.get_user(int(report['user_id']))
-            try:
-                # try to send report
-                id = await ReportUtils.add_report(user, report, ReportSource.form)
-                reply = dict(UUID=report["UUID"], submitted=True, lockdown=False,
-                             message=f"Your report ID is {id}")
-                await self.bot.redis.send('bot_to_web', reply)
-            except Exception as ex:
-                # something went wrong, notify the other side
-                reply = dict(UUID=report["UUID"], submitted=False, lockdown=False, message="Something went very wrong. Mods have been notified, please try again later")
-                await self.bot.redis.send('bot_to_web', reply)
-                raise ex
 
     async def process_trello_event(self, data):
         card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']

@@ -3,8 +3,9 @@ import uuid
 
 from aiohttp import web
 
-from Utils import ReportUtils, RedisListener
+from Utils import ReportUtils, RedisMessager
 from Utils.Enums import ReportError
+from Utils.RedisMessager import Redisception
 from Utils.ReportUtils import BugReportException
 
 routes = web.RouteTableDef()
@@ -64,37 +65,27 @@ async def hello(request):
 
     else:
         # send it to the bot for final processing
-        await request.app.redis.send('web_to_bot', data)
-        reply = None
-        # wait for the bot to process the report, up to 5 seconds
-        for i in range(50):
-            await asyncio.sleep(0.1)
-            if uid in replies:
-                reply = replies[uid]
-                del replies[uid]
-                break
-        if reply is not None:
-            return web.json_response(reply, status=200 if reply["submitted"] else 400)
-        else:
+        data["type"] = "bug_submission"
+        try:
+            reply = await request.app.redis.get_reply('web_to_bot', data)
+        except Redisception:
             # no reply, the bot isn't there or something is very wrong
             reply = dict(submitted=False, message="Report submission failed, please try again later")
             return web.json_response(reply, status=500)
+        else:
+            return web.json_response(reply, status=200 if reply["submitted"] else 400)
 
 
 async def initialize(app):
     # TODO: error proper logging
-    app.redis = RedisListener.Listener(app.loop)
+    app.redis = RedisMessager.Messager("bot-web-messages", "web-bot-messages", app.loop)
     await app.redis.initialize()
-    await app.redis.subscribe('bot_to_web', receive_reply, print)
 
 
 async def shutdown(app):
     await app.redis.terminate()
 
 
-async def receive_reply(reply):
-    # hello from other side, here is your reply!
-    replies[reply["UUID"]] = reply
 
 
 app = web.Application()

@@ -12,7 +12,7 @@ from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisListener
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisMessager
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
@@ -48,7 +48,7 @@ async def on_ready():
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         try:
-            bugbot.redis = RedisListener.Listener(bugbot.loop)
+            bugbot.redis = RedisMessager.Listener(bugbot.loop)
             await bugbot.redis.initialize()
         except OSError:
             # no redis present, set connection to none
