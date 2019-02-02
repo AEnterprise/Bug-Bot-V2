@@ -6,7 +6,7 @@ from discord import Embed
 
 from Utils import Configuration, Utils, Emoji
 from Utils.DataUtils import Bug
-from Utils.Enums import Platforms, ReportError
+from Utils.Enums import Platforms, ReportError, BugInfoType, BugBlockType
 
 
 class BugReportException(Exception):
@@ -46,7 +46,6 @@ def validate_report(report):
         raise BugReportException(ReportError.blacklisted_words, ', '.join(blacklist))
 
 
-
 async def add_report(user, sections, source):
 
     # Add report to database and get report ID
@@ -55,6 +54,7 @@ async def add_report(user, sections, source):
         title=sections['title'],
         steps=sections['steps'],
         expected=sections['expected'],
+        actual=sections['actual'],
         client_info=sections['client'],
         device_info=sections['system'],
         platform=Platforms[sections["platform"].lower()],
@@ -71,7 +71,7 @@ async def add_report(user, sections, source):
     platforms = Configuration.get_var('bugbot', 'BUG_PLATFORMS')
     platform_data = platforms.get(sections["platform"].upper(), None)
     if not platform_data['EMOJI'].startswith(':'):
-       platform_data['EMOJI'] = Emoji.get_chat_emoji(platform_data['EMOJI'])
+        platform_data['EMOJI'] = Emoji.get_chat_emoji(platform_data['EMOJI'])
     report['platform'] = {'name': platform_data['DISPLAY'], 'colour': platform_data['COLOUR'], 'emoji': platform_data['EMOJI']}
     em = build_report_embed(report)
 
@@ -87,13 +87,10 @@ async def add_report(user, sections, source):
     return bug.id
 
 
-
 def build_report_embed(data):
     em = Embed(colour=data['platform']['colour'])
-    if 'lock' in data:
-        mod = data['lock']['username']
-        reason = data['lock']['reason']
-        em.description = f':lock: This report has been temporarily locked by {mod} and cannot be interacted with (`{reason}`)'
+    if 'block_text' in data:
+        em.description = f':lock: {data["block_text"]}'
     em.add_field(name='Submitter', value=f'{data["submitter"]["username"]} (`{data["submitter"]["id"]}`) {data["submitter"]["emoji"]}', inline=False)
     em.add_field(name='Platform', value=f'{data["platform"]["name"]} {data["platform"]["emoji"]}', inline=False)
     em.add_field(name='Short Description', value=data['title'], inline=False)
@@ -104,14 +101,17 @@ def build_report_embed(data):
     em.add_field(name='Device/System Info', value=data['system'], inline=True)
     em.add_field(name='Report ID', value=f'**{data["id"]}**', inline=False)
 
+    if 'trello_id' in data:
+        em.add_field(name='Trello', value=f'https://trello.com/c/{data["trello_id"]}', inline=False)
+
     interactions = []
     for x in reversed(data['repros']):
-        if x['type'] == 'approve':
+        if x['type'] == 'can_reproduce':
             emoji = Emoji.get_chat_emoji('APPROVE')
-        elif x['type'] == 'deny':
+        elif x['type'] == 'can_not_reproduce':
             emoji = Emoji.get_chat_emoji('DENY')
         elif x['type'] == 'note':
-           emoji = ':pencil:'
+            emoji = ':pencil:'
         interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): `{x["details"]}`')
     for x in data['attachments']:
         interactions.append(f':paperclip: **{x["username"]}** (`{x["id"]}`): {x["link"]}')
@@ -121,42 +121,67 @@ def build_report_embed(data):
 
     return em
 
-        # EXAMPLE FORMAT:
-        # {
-        #     "platform": {
-        #         "name": "iOS",
-        #         "colour": 10460830,
-        #         "emoji": ":iphone:"
-        #     },
-        #     "submitter": {
-        #         "username": "Test#1234",
-        #         "id": 258274103935369219,
-        #         "emoji": "<:meowbughunter:533815499541184532>"
-        #     },
-        #     "id": 13883,
-        #     "title": "",
-        #     "steps": "1. This is a step\n2. Another step",
-        #     "expected": "",
-        #     "actual": "",
-        #     "client": "",
-        #     "system": "",
-        #     "repros": [
-        #         {
-        #             "username": "Test#1234",
-        #             "id": 258274103935369219,
-        #             "type": "approve",
-        #             "details": "Can repro..."
-        #         }
-        #     ],
-        #     "lock": {
-        #         "username": "Test#1234",
-        #         "reason": "Checking with devs"
-        #     },
-        #     "attachments": [
-        #         {
-        #             "username": "Test#1234",
-        #             "id": 258274103935369219,
-        #             "link": ""
-        #         }
-        #     ]
-        # }
+
+def bug_to_embed(bug, bot):
+    # Get the platform data
+    platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
+    # Prepare the dict to build the embed
+    data = {
+        'platform': {
+            'name': platform['DISPLAY'],
+            'colour': platform['COLOUR'],
+            'emoji': platform['EMOJI']
+        },
+        'submitter': {
+            'username': str(bot.get_user(bug.reporter)),
+            'id': bug.reporter,
+            'emoji': ''
+        },
+        'id': bug.id,
+        'title': bug.title,
+        'steps': bug.steps,
+        'expected': bug.expected,
+        'actual': bug.actual,
+        'client': bug.client_info,
+        'system': bug.device_info,
+        'repros': [],
+        'attachments': []
+    }
+    # Get the platform emoji if it's custom
+    if not data['platform']['emoji'].startswith(':'):
+        data['platform']['emoji'] = Emoji.get_chat_emoji(data['platform']['emoji'])
+    # Add user emoji if they're a hunter
+    reporter = Configuration.get_tester(bug.reporter)
+    if reporter is not None:
+        if Configuration.get_role('BUG_HUNTER') in reporter.roles:
+            data['submitter']['emoji'] = Emoji.get_chat_emoji('MEOWBUGHUNTER')
+    # Prepare repro/notes/attachments
+    stances = {'can_reproduce': 0, 'can_not_reproduce': 0}
+    for i in bug.info:
+        item = {'username': str(bot.get_user(i.user)), 'id': i.user}
+        if i.type == BugInfoType.attachment:
+            item['link'] = i.content
+            data['attachments'].append(item)
+        else:
+            item['type'] = i.type.name
+            item['details'] = i.content
+            data['repros'].append(item)
+            try:
+                stances[i.type.name] += 1
+            except KeyError:
+                pass
+    # If the bug has been locked
+    if bug.block_type == BugBlockType.user:
+        data['block_text'] = 'This report has been temporarily locked for the reporter to make edits'
+    elif bug.block_type == BugBlockType.mod:
+        data['block_text'] = f'This report has been temporarily locked by {bot.get_user(bug.block_user)}: `{bug.block_reason}`'
+    elif bug.block_type == BugBlockType.flow:
+        state = 'approved/denied'
+        if stances['can_reproduce'] >= 3:
+            state = 'approved'
+        elif stances['can_not_reproduce'] >= 3:
+            state = 'denied'
+        data['block_text'] = f'This report will be fully {state} in 20 seconds unless a !revoke is used'
+    if bug.trello_id is not None:
+        data['trello_id'] = bug.trello_id
+    return build_report_embed(data)

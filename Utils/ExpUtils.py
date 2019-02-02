@@ -84,13 +84,10 @@ async def award_bug_xp(bot, trello_id, list_id=None, label_ids=[], archived=Fals
         await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` was archived during verification')
     # If the card is in one of the dead bug/won't fix/CNR lists
     elif list_id in Configuration.get_var('bugbot', 'TRELLO').get('DEAD_BUG_LISTS'):
-        amount = Configuration.get_var('bugbot', 'XP').get('DEAD_BUG')
-        add_xp(bug.reporter, amount, bot.user.id, TransactionEvent.bug_verified)
         bug.xp_awarded = True
         bug.trello_list = list_id
         bug.save()
-        member = dt.get_member(bug.reporter)
-        await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` marked as dead. Gave {amount} XP to {member} (`{bug.reporter}`)')
+        await BugBotLogging.bot_log(f':eye_in_speech_bubble: Bug `{trello_id}` marked as dead during verification')
     else:
         # Loop through the priority label sets (P0 - P3)
         for severity, data in Configuration.get_var('bugbot', 'TRELLO').get('PRIORITIES').items():
