@@ -16,8 +16,8 @@ def is_trello_ip(ip):
     return ip in ['107.23.104.115', '107.23.149.70', '54.152.166.250', '54.164.77.56', '54.209.149.230']
 
 
-@routes.head('/BugBot/trello')
-@routes.post('/BugBot/trello')
+@routes.head('/bugbot/trello')
+@routes.post('/bugbot/trello')
 async def trello(request):
     remote_ip = request.remote
     if remote_ip == '127.0.0.1':
@@ -107,10 +107,10 @@ async def shutdown(app):
 app = web.Application()
 app.add_routes(routes)
 
-resource = app.router.add_resource('/user_reports/{user:\d+}')
+resource = app.router.add_resource('bugbot/user_reports/{user:\d+}')
 resource.add_route('GET', get_reports)
 
-resource = app.router.add_resource('/bugs/{bug:\d+}')
+resource = app.router.add_resource('bugbot/bugs/{bug:\d+}')
 resource.add_route('GET', get_report)
 
 app.on_startup.append(initialize)
