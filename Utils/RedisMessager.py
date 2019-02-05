@@ -56,8 +56,9 @@ class Messager:
 
 
 
-    async def get_reply(self, data):
+    async def get_reply(self, type, data):
         try:
+            data["type"] = type
             return (await asyncio.wait_for(self._get_reply(data), 10))["reply"]
         except TimeoutError:
             raise Redisception("No reply received from the bot!")

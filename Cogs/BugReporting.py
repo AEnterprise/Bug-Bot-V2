@@ -33,18 +33,10 @@ def platform_convert(platform):
 class BugReporting:
     def __init__(self, bot):
         self.bot = bot
-        bot.loop.create_task(self.redis_init())
         bot.lockdown = False
         bot.lockdown_message = ""
 
-    async def redis_init(self):
-        if self.bot.redis:
-            BugBotLogging.info("Redis connection found, connecting and disabling dev submit command")
-            self.bot.remove_command("submit")
-            await self.bot.redis.subscribe('web_to_bot', self.receive_report, BugBot.handle_exception)
-            await self.bot.redis.subscribe('trello', self.process_trello_event, BugBot.handle_exception)
-        else:
-            BugBotLogging.warn("No redis connection found, leaving dev submit command in place for testing")
+
 
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:

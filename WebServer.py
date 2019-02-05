@@ -31,7 +31,7 @@ async def trello(request):
     return web.Response()
 
 
-@routes.post('/BugBot/reports')
+@routes.post('/bugbot/reports')
 async def hello(request):
     # retrieve data:
     input = await request.post()
@@ -39,9 +39,6 @@ async def hello(request):
     data = dict()
     for k, v in input.items():
         data[k] = v
-    # attach UUID to track the reply
-    uid = str(uuid.uuid4())
-    data["UUID"] = uid
     try:
         # make sure it's valid
         ReportUtils.validate_report(data)
@@ -51,7 +48,8 @@ async def hello(request):
         if ex.code is ReportError.unknown_platform:
             reply["message"] = f'{ex.msg} is not a valid platform!'
         elif ex.code is ReportError.links_detected:
-            reply["message"] = 'Your report contains links, this is not allowed, please submit without links and ask a bug hunter to attach the images'
+            reply[
+                "message"] = 'Your report contains links, this is not allowed, please submit without links and ask a bug hunter to attach the images'
         elif ex.code is ReportError.missing_fields:
             reply["message"] = f'{ex.msg} is a required field'
         elif ex.code is ReportError.missing_steps:
@@ -65,15 +63,35 @@ async def hello(request):
 
     else:
         # send it to the bot for final processing
-        data["type"] = "bug_submission"
         try:
-            reply = await request.app.redis.get_reply('web_to_bot', data)
+            reply = await request.app.redis.get_reply("bug_submission", data)
         except Redisception:
             # no reply, the bot isn't there or something is very wrong
             reply = dict(submitted=False, message="Report submission failed, please try again later")
             return web.json_response(reply, status=500)
         else:
             return web.json_response(reply, status=200 if reply["submitted"] else 400)
+
+
+async def get_reports(request):
+    user_id = request.match_info['user']
+    page = request.rel_url.query['page'] if 'page' in request.rel_url.query else 1
+    print(f"Report info requested for user {user_id}, page {page}")
+    try:
+        response = await request.app.redis.get_reply("user_reports", dict(user=user_id, page=page))
+        return web.json_response(**response)
+    except Redisception:
+        return web.Response(body="Unable to communicate with the bot, please try again later", status=503)
+
+
+async def get_report(request):
+    bid = request.match_info['bug']
+    print(f"Report bug info requested for bug {bid}")
+    try:
+        response = await request.app.redis.get_reply("get_bug", dict(bug=bid))
+        return web.json_response(**response)
+    except Redisception:
+        return web.Response(body="Unable to communicate with the bot, please try again later", status=503)
 
 
 async def initialize(app):
@@ -86,10 +104,15 @@ async def shutdown(app):
     await app.redis.terminate()
 
 
-
-
 app = web.Application()
 app.add_routes(routes)
+
+resource = app.router.add_resource('/user_reports/{user:\d+}')
+resource.add_route('GET', get_reports)
+
+resource = app.router.add_resource('/bugs/{bug:\d+}')
+resource.add_route('GET', get_report)
+
 app.on_startup.append(initialize)
 app.on_cleanup.append(shutdown)
 web.run_app(app)
