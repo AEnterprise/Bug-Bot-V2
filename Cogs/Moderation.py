@@ -1,13 +1,14 @@
 import discord
 from discord.ext import commands
 
-from Utils import Checks, BugBotLogging
+from Utils import Checks, BugBotLogging, Configuration
 
 
 class Moderation:
 
     def __init__(self, bot):
         self.bot = bot
+
 
     @commands.command()
     @Checks.is_modinator()
@@ -51,6 +52,18 @@ class Moderation:
             av = ', '.join(discord.VerificationLevel.__members__.keys())
             await ctx.send(f'That level name doesn\'t seem to be valid. Acceptable values include: `{av}`')
 
+    @commands.command()
+    @Checks.is_employee()
+    async def employee(self, ctx: commands.Context, user: discord.Member):
+        role = Configuration.get_role("employee")
+        if role is None:
+            return await ctx.send("This role may be either deleted or not configured properly.")
+        try:
+            await user.add_roles(role)
+            await ctx.send(f"{user.name}#{user.discriminator} (`{user.id}`) has been made an employee!")
+            await BugBotLogging.bot_log(f":briefcase: {ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) has made {user.name}#{user.discriminator} (`{user.id}`) an employee!")
+        except discord.Forbidden:
+            await ctx.send(f"I was not able to add the employee role to the {user.name}#{user.discriminator} (`{user.id}`)")
 
 def setup(bot):
     bot.add_cog(Moderation(bot))
