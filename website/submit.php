@@ -71,10 +71,10 @@
             <textarea type="text" name="expected"></textarea><br>
             <label name="actual" >What actually happens when you follow the steps you wrote earlier? *</label><br>
             <textarea type="text" name="actual"></textarea><br>
-            <label name="client" >What build of Discord are you using? *</label><br>
-            <textarea type="text" name="client"></textarea><br>
-            <label name="system" >What device you are using? *</label><br>
-            <textarea type="text" name="system"></textarea><br><br>
+            <label name="client_info" >What build of Discord are you using? *</label><br>
+            <textarea type="text" name="client_info"></textarea><br>
+            <label name="device_info" >What device you are using? *</label><br>
+            <textarea type="text" name="device_info"></textarea><br><br>
             <label name="platform" >What platform are you using? *</label><br>
               <select name="platform">
                   <option value="android">android</option>

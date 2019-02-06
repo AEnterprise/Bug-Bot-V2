@@ -6,7 +6,7 @@ from aioredis.pubsub import Receiver
 import BugBot
 from Utils import Configuration, BugBotLogging, ReportUtils, Checks
 from Utils.DataUtils import Bug
-from Utils.Enums import ReportSource
+from Utils.Enums import ReportSource, Platforms
 
 
 class WebLink:
@@ -20,10 +20,10 @@ class WebLink:
         self.handlers = dict(
             bug_submission=self.submit,
             user_reports=self.user_reports,
-            get_bug=self.get_bug
+            get_bug=self.get_bug,
+            patch_bug=self.patch_bug
         )
         self.task = self._receiver()
-
 
     def __unload(self):
         self.bot.loop.create_task(self._unload())
@@ -83,21 +83,22 @@ class WebLink:
         # determine if the user is a moderator or not (moderators can see and edit all reports)
         # TODO: what if the user is not there? give error, give results, handled by discord?
         user_id = int(data["user"])
-        user = Configuration.get_tester(user_id)
-        if user is not None:
-            query = Bug.select()
-            if not Checks.is_mod(user):
-                query = query.where(Bug.reporter == user_id)
-            bugs = list()
-            for bug in query.order_by(Bug.id.desc()).paginate(data["page"], 25):
+        query = Bug.select()
+        if self.is_mod(user_id):
+            query = query.where(Bug.reporter == user_id)
+        bugs = list()
+        for bug in query.order_by(Bug.id.desc()).paginate(data["page"], 25):
+            bugs.append(dict(
+                id=bug.id,
+                title=bug.title,
+                state=bug.state.value,
+                platform=bug.platform.value
+            ))
+        return dict(status=200, data=bugs)
 
-                bugs.append(dict(
-                    id=bug.id,
-                    title=bug.title,
-                    state=bug.state.value,
-                    platform=bug.platform.value
-                ))
-            return dict(status=200, data=bugs)
+    def is_mod(self, user_id):
+        user = Configuration.get_tester(user_id)
+        return user is not None and Checks.is_mod(user)
 
     async def get_bug(self, data):
         rid = int(data["bug"])
@@ -118,8 +119,30 @@ class WebLink:
 
             )
             return dict(status=200, data=report_dict)
-        return dict(status=404, content="No report found")
-        pass
+        return dict(status=404, data=dict(updated=False, message="No report found"))
+
+    async def patch_bug(self, data):
+        # webserver did the validation already
+        bug = Bug.get_or_none(id=data["bug"])
+        if bug is None:
+            return dict(status=404, data=dict(updated=False, message="Invalid bug ID"))
+        user_id = int(data["user_id"])
+        if user_id != bug.reporter and not self.is_mod(user_id):
+            return dict(status=403, data=dict(updated=False, message="You are not allowed to edit this bug"))
+        new_info = data["data"]
+        for k, v in new_info.items():
+            if k == "platform":
+                platforms = Configuration.get_var('bugbot', 'BUG_PLATFORMS')
+                platform_data = platforms.get(v.upper(), None)
+                if platform_data is None:
+                    for p, pd in platforms.items():
+                        if v.lower() in pd['ALIASES']:
+                            v = p
+                            break
+            setattr(bug, k, v)
+        bug.save()
+        await ReportUtils.update_bug(bug, self.bot)
+        return dict(status=200, data=dict(updated=True))
 
 
 def setup(bot):

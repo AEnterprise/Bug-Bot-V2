@@ -27,38 +27,46 @@ async def trello(request):
     # TODO: Could also verify the signature
     if request.method == 'POST':
         data = await request.json()
+        # FIXME: BROKEN, DON'T FORGET TO FIX!
         await request.app.redis.send('trello', data['action'])
     return web.Response()
 
 
-@routes.post('/bugbot/reports')
-async def hello(request):
-    # retrieve data:
-    input = await request.post()
-    # convert to a regular dict so we we can serialize to json
+def get_error(ex):
+    message = "UNKNOWN EXCEPTION TYPE"
+    if ex.code is ReportError.unknown_platform:
+        message = f'{ex.msg} is not a valid platform!'
+    elif ex.code is ReportError.links_detected:
+        message = 'Your report contains links, this is not allowed, please submit without links and ask a bug hunter to attach the images'
+    elif ex.code is ReportError.missing_fields:
+        message = f'{ex.msg} is a required field'
+    elif ex.code is ReportError.missing_steps:
+        message = f'You need to supply steps'
+    elif ex.code is ReportError.blacklisted_words:
+        message = f'You cannot use {ex.msg}'
+    elif ex.code is ReportError.length_exceeded:
+        message = f'{ex.msg} is too long'
+    elif ex.code is ReportError.bad_field:
+        message = f'Unknown bug field: {ex.msg}'
+    return message
+
+def to_dict(input):
     data = dict()
     for k, v in input.items():
         data[k] = v
+    return data
+
+
+@routes.post('/bugbot/reports')
+async def incomming_report(request):
+    # convert to a regular dict so we we can serialize to json
+    data = to_dict(await request.post())
     try:
         # make sure it's valid
         ReportUtils.validate_report(data)
     except BugReportException as ex:
         # not valid, notify sender
-        reply = dict(submitted=False)
-        if ex.code is ReportError.unknown_platform:
-            reply["message"] = f'{ex.msg} is not a valid platform!'
-        elif ex.code is ReportError.links_detected:
-            reply[
-                "message"] = 'Your report contains links, this is not allowed, please submit without links and ask a bug hunter to attach the images'
-        elif ex.code is ReportError.missing_fields:
-            reply["message"] = f'{ex.msg} is a required field'
-        elif ex.code is ReportError.missing_steps:
-            reply["message"] = f'You need to supply steps'
-        elif ex.code is ReportError.blacklisted_words:
-            reply["message"] = f'You cannot use {ex.msg}'
-        elif ex.code is ReportError.length_exceeded:
-            reply["message"] = f'{ex.msg} is too long'
-
+        reply = dict(submitted=False, message=get_error(ex))
         return web.json_response(reply, status=400)
 
     else:
@@ -73,7 +81,7 @@ async def hello(request):
             return web.json_response(reply, status=200 if reply["submitted"] else 400)
 
 
-async def get_reports(request):
+async def get_bugs(request):
     user_id = request.match_info['user']
     page = request.rel_url.query['page'] if 'page' in request.rel_url.query else 1
     print(f"Report info requested for user {user_id}, page {page}")
@@ -84,7 +92,7 @@ async def get_reports(request):
         return web.Response(body="Unable to communicate with the bot, please try again later", status=503)
 
 
-async def get_report(request):
+async def get_bug(request):
     bid = request.match_info['bug']
     print(f"Report bug info requested for bug {bid}")
     try:
@@ -92,6 +100,23 @@ async def get_report(request):
         return web.json_response(**response)
     except Redisception:
         return web.Response(body="Unable to communicate with the bot, please try again later", status=503)
+
+
+async def patch_bug(request):
+    data = to_dict(await request.post())
+    # extract user id, doesn't need to be validated
+    user_id = data["user_id"]
+    del data["user_id"]
+    try:
+        # validate new data, ignore missing fields as they where not changed
+        ReportUtils.validate_report(data, require_all=False)
+    except BugReportException as ex:
+        # not valid, notify sender
+        reply = dict(submitted=False, message=get_error(ex))
+        return web.json_response(reply, status=400)
+    else:
+        response = await request.app.redis.get_reply("patch_bug", dict(bug=request.match_info['bug'], data=data, user_id=user_id))
+        return web.json_response(**response)
 
 
 async def initialize(app):
@@ -107,11 +132,12 @@ async def shutdown(app):
 app = web.Application()
 app.add_routes(routes)
 
-resource = app.router.add_resource('bugbot/user_reports/{user:\d+}')
-resource.add_route('GET', get_reports)
+resource = app.router.add_resource('/bugbot/user_reports/{user:\d+}')
+resource.add_route('GET', get_bugs)
 
-resource = app.router.add_resource('bugbot/bugs/{bug:\d+}')
-resource.add_route('GET', get_report)
+resource = app.router.add_resource('/bugbot/bugs/{bug:\d+}')
+resource.add_route('GET', get_bug)
+resource.add_route('PATCH', patch_bug)
 
 app.on_startup.append(initialize)
 app.on_cleanup.append(shutdown)

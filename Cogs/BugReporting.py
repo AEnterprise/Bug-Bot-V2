@@ -11,8 +11,8 @@ import BugBot
 from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpUtils
 
 from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
-from Utils.DataUtils import Storeinfo, Bug
-from Utils.Enums import Platforms, ReportSource, ReportError
+from Utils.DataUtils import Storeinfo, Bug, BugInfo
+from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
 from Utils.ReportUtils import BugReportException
 from Utils.Trello import TrelloException
 
@@ -507,7 +507,7 @@ class BugReporting:
 
             # Remove XP
             amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
-            ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)  # TODO: This needs to adjust their lifetime XP too or could be exploited
+            ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)
 
             reply = 'REVOKED_STANCE'
             await BugBotLogging.bot_log(f':wastebasket: {ctx.author} ({ctx.author.id}) revoked their stance on report {report_id}')

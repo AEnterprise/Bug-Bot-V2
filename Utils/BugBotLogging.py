@@ -31,7 +31,7 @@ def init_logger():
 
     if not os.path.isdir("logs"):
         os.mkdir("logs")
-    handler = TimedRotatingFileHandler(filename='logs/gearbot.log', encoding='utf-8', when="midnight", backupCount=30)
+    handler = TimedRotatingFileHandler(filename='logs/bugbot.log', encoding='utf-8', when="midnight", backupCount=30)
     handler.setFormatter(formatter)
     handler.setLevel(logging.INFO)
     DISCORD_LOGGER.addHandler(handler)
