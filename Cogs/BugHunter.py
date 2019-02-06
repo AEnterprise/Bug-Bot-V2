@@ -21,7 +21,6 @@ class BugHunter:
         else:
             await ctx.send(f'{member} is not eligible to become an initiate')
 
-    # TODO: Call this when a bug is approved and it'll handle making the reporter an initiate (if eligible)
     async def make_initiate(self, member):
         # Check they're not already a BH/initiate
         role_ids = [Configuration.get_master_var('ROLES')[r] for r in ['BUG_HUNTER', 'INITIATE']]

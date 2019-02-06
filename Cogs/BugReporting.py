@@ -1,17 +1,18 @@
 import re
 import asyncio
+import operator
+from functools import reduce
 from datetime import datetime
 
 import discord
 from discord.ext import commands
 
 import BugBot
-from Utils import Configuration, RedisListener, BugBotLogging, ReportUtils, ExpUtils
-
-from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
-from Utils.DataUtils import Storeinfo, Bug
-from Utils.Enums import Platforms, ReportSource, ReportError
+from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji, RedisListener, ReportUtils, ExpUtils
+from Utils.DataUtils import Storeinfo, Bug, BugInfo
+from Utils.Enums import Platforms, ReportSource, ReportError, BugState, BugInfoType, TransactionEvent, BugBlockType
 from Utils.ReportUtils import BugReportException
+from Utils.Trello import TrelloException
 
 
 def platform_convert(platform):
@@ -43,12 +44,14 @@ class BugReporting:
         else:
             BugBotLogging.warn("No redis connection found, leaving dev submit command in place for testing")
 
-
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:
             return
         if message.channel.id not in Configuration.list_of_bugchannels_ids():
             return
+        for role in message.author.roles:
+            if role.id == Configuration.get_role('MODINATOR').id:
+                return
         ctx = await self.bot.get_context(message)
         if ctx.command is None:
             await message.channel.send(Configuration.get_var('strings', 'NON_COMMANDS_MSG').format(user=message.author.mention), delete_after=5)
@@ -179,14 +182,10 @@ class BugReporting:
             if ctx.guild is not None:
                 await ctx.message.delete()
 
-    async def process_web_report(self, data):
-        pass
-
     @commands.command()
     # @Checks.dm_only()  # For easier testing
     async def submit(self, ctx: commands.Context, platform: str, title, steps, expected, actual, client, system):
-        dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
-        member = dt.get_member(ctx.author.id)
+        member = Configuration.get_tester(ctx.author.id)
         try:
             sections = dict(title=title, steps=steps, expected=expected, actual=actual, client=client, system=system)
             steps = sections['steps'].split(' - ')
@@ -207,6 +206,339 @@ class BugReporting:
         else:
             await BugBotLogging.bot_log(f':clipboard: {ctx.author} ({ctx.author.id}) submitted a new report ({report_id})')
             await ctx.send(Configuration.get_var('strings', 'REPORT_SUBMITTED').format(user=ctx.author))
+
+    def sub_storeinfo(self, content, user_id):
+        flags = list(set(re.findall(r'-[a-z]\b', content, re.IGNORECASE)))
+        for i in flags:
+            pf = platform_convert(i)
+            if pf:
+                info = Storeinfo.get_or_none(userid=user_id, platform=pf[0])
+                if info is not None:
+                    content = re.sub(fr'{i}\b', info.information, content, flags=re.IGNORECASE)
+        return content
+
+    async def complete_approval_flow(self, bug):
+        # Get reporter (or user if not in DTesters)
+        reporter = Configuration.get_tester(bug.reporter)
+        if reporter is None:
+            reporter = self.bot.get_user(bug.reporter)
+
+        # Give initial XP for approval
+        amount = Configuration.get_var('bugbot', 'XP').get('APPROVED_BUG', 5)
+        ExpUtils.add_xp(bug.reporter, amount, self.bot.user.id, TransactionEvent.bug_approved)
+        await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter} ({reporter.id}) for an approved bug')
+
+        # Build the Trello content
+        content = Configuration.get_var('strings', 'TRELLO_CONTENT').format(reporter=reporter, bug=bug)
+
+        # Get the new list ID
+        list_id = Configuration.get_var('bugbot', 'BUG_PLATFORMS')[bug.platform.name.upper()]['NEW_LIST']
+
+        # Push to Trello
+        trello_id = await self.bot.trello.add_card(list_id, bug.title, content)
+
+        # Set extra details in the DB
+        bug.block_type = BugBlockType.none
+        bug.trello_id = trello_id
+        bug.state = BugState.approved
+        bug.last_state_change = datetime.utcnow()
+        bug.trello_list = list_id
+        bug.save()
+
+        # Generate a new embed
+        em = ReportUtils.bug_to_embed(bug, self.bot)
+
+        # Post the embed in the appropriate report channel
+        msg = await Configuration.get_bugchannel(bug.platform.name.upper()).send(embed=em)
+
+        # Add the new message ID to the DB
+        bug.msg_id = msg.id
+        bug.save()
+
+        # Add approvals to Trello
+        for i in bug.info:
+            if i.type == BugInfoType.can_reproduce:
+                repro = Configuration.get_var('strings', 'TRELLO_CANREPRO').format(content=i.content, user=self.bot.get_user(i.user))
+                comment_id = await self.bot.trello.add_comment(trello_id, repro)
+                i.trello_id = comment_id
+                i.save()
+                await asyncio.sleep(1)
+
+        trello_link = f'https://trello.com/c/{trello_id}'
+
+        await BugBotLogging.bot_log(f':incoming_envelope: Report {bug.id} has been fully approved and added to Trello under <{trello_link}>')
+
+        # Follow new initiate flow or DM an approved message if they're already a hunter
+        if hasattr(reporter, 'roles'):
+            if Configuration.get_role('BUG_HUNTER') in reporter.roles:
+                # Already a hunter
+                try:
+                    await reporter.send(Configuration.get_var('strings', 'BUG_APPROVED').format(trello_link=trello_link, report_id=bug.id))
+                except discord.Forbidden:
+                    # Closed DMs
+                    pass
+            else:
+                bh_cog = self.bot.get_cog('BugHunter')
+                await bh_cog.make_initiate(reporter)  # FIXME: They won't get informed if they're already an initiate
+
+    async def complete_denial_flow(self, bug):
+        # Set extra details in the DB
+        bug.block_type = BugBlockType.none
+        bug.state = BugState.denied
+        bug.last_state_change = datetime.utcnow()
+        bug.save()
+
+        # Generate a new embed
+        em = ReportUtils.bug_to_embed(bug, self.bot)
+
+        # Post the embed in the denied bugs channel
+        msg = await Configuration.get_bugchannel('DENIED').send(embed=em)
+
+        # Add the new message ID
+        bug.msg_id = msg.id
+        bug.save()
+
+        await BugBotLogging.bot_log(f':clipboard: Report {bug.id} has been fully denied')
+
+        # Build jump link
+        guild_id = Configuration.get_master_var('GUILD_ID')
+        channel_id = Configuration.get_master_var('BUGCHANNELS')['DENIED']
+        jumplink = f'https://discordapp.com/channels/{guild_id}/{channel_id}/{msg.id}'
+
+        # Post a denied message in the queue
+        queue_reply = Configuration.get_var('strings', 'BUG_DENIED_QUEUE').format(report_id=bug.id, jumplink=jumplink)
+        await Configuration.get_bugchannel('QUEUE').send(queue_reply, delete_after=20.0)
+
+        # DM the reporter
+        reporter = self.bot.get_user(bug.reporter)
+        if reporter is not None:
+            reasons = []
+            denials = [i for i in bug.info if i.type == BugInfoType.can_not_reproduce]
+            for idx, i in enumerate(denials):
+                deny_user = str(self.bot.get_user(i.user))
+                reasons.append(f'{idx + 1}. `{deny_user}`: `{i.content}`')
+            deny_dm = Configuration.get_var('strings', 'BUG_DENIED_DM').format(title=bug.title, report_id=bug.id, reasons='\n'.join(reasons))
+            try:
+                await reporter.send(deny_dm)
+            except discord.Forbidden:
+                # Closed DMs
+                pass
+
+    async def process_stance(self, ctx, report_id, content, stance, override=False):
+        err = None
+        # Escape the stance content
+        content = Utils.escape_markdown(content)
+        # Try and get the bug
+        bug = Bug.get_or_none(id=report_id)
+        # Check we're in the queue
+        if ctx.channel.id != Configuration.get_master_var('BUGCHANNELS')['QUEUE']:
+            err = 'STANCE_WRONG_CHANNEL'
+        # Check the bug is valid
+        elif bug is None:
+            err = 'INVALID_REPORT_ID'
+        # Check the bug is queued
+        elif bug.state != BugState.queued:
+            err = 'BUG_NOT_QUEUED'
+        # Check the bug isn't locked/in the 20s wait period
+        elif bug.block_type != BugBlockType.none:
+            err = 'BUG_LOCKED'
+        # Check the content isn't too long
+        elif len(content) > 500:
+            err = 'STANCE_TOO_LONG'
+        # If approving, check it's not their own bug
+        elif stance == 'approve':
+            if bug.reporter == ctx.author.id and not override:
+                err = 'SELF_APPROVE_DISALLOWED'
+
+        if err is None:
+            # Substitute storeinfo flags
+            content = self.sub_storeinfo(content, ctx.author.id)
+
+            # Try and get an existing stance
+            stance_obj = BugInfo.get_or_none(BugInfo.user == ctx.author.id, BugInfo.bug == bug, BugInfo.type << [BugInfoType.can_reproduce, BugInfoType.can_not_reproduce])
+
+            # Set the BugInfoType
+            if stance == 'approve':
+                stance_type = BugInfoType.can_reproduce
+                action = 'approved'
+                emoji = ':thumbsup:'
+            elif stance == 'deny':
+                stance_type = BugInfoType.can_not_reproduce
+                action = 'denied'
+                emoji = ':thumbsdown:'
+
+            log_suffix = ''
+
+            # If they don't have a stance, create one
+            if stance_obj is None:
+                BugInfo.create(user=ctx.author.id, content=content, bug=bug, type=stance_type)
+                reply = f'{stance.upper()}_ADDED'
+                # Give XP (if eligible)
+                if ctx.author.id != bug.reporter:
+                    exp_cog = self.bot.get_cog('Experience')
+                    await exp_cog.give_repro_xp(ctx.author.id, TransactionEvent[stance])
+            # If they have an existing stance, update it
+            else:
+                stance_obj.type = stance_type
+                stance_obj.content = content
+                stance_obj.added = datetime.utcnow()
+                stance_obj.save()
+                reply = 'STANCE_CHANGED'
+                log_suffix = ' (updated stance)'
+
+            await BugBotLogging.bot_log(f'{emoji} {ctx.author} ({ctx.author.id}) {action} report {report_id}{log_suffix}')
+
+        # Get the response string
+        if err is not None:
+            reply = err
+        reply = Configuration.get_var('strings', reply).format(user=ctx.author)
+
+        # Reply to the user
+        await ctx.send(reply, delete_after=3.0)
+
+        # Delete their invoke message
+        await asyncio.sleep(3)
+        await ctx.message.delete()
+
+        if err is not None:
+            return
+
+        # Get users who have a stance on the bug
+        users = [i.user for i in bug.info if i.type == stance_type]
+
+        # If they denied their own bug, set the required stance override
+        if stance == 'deny' and ctx.author.id == bug.reporter:
+            override = True
+
+        # If we're in the final approval/denial flow
+        if override or len(users) >= Configuration.get_var('bugbot', 'REQUIRED_STANCES')[stance.upper()]:
+            # Lock the bug
+            bug.block_type = BugBlockType.flow
+            bug.save()
+
+            # Rebuild the embed
+            em = ReportUtils.bug_to_embed(bug, self.bot)
+
+            # Update queue message with the new embed
+            queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
+            await queue_msg.edit(embed=em)
+
+            def revoke_check(data):
+                return data['bug_id'] == bug.id and data['user_id'] in users and data['stance'] == stance
+
+            try:
+                await self.bot.wait_for('revoke', check=revoke_check, timeout=20.0)
+            except asyncio.TimeoutError:
+                if stance == 'approve':
+                    await self.complete_approval_flow(bug)
+                elif stance == 'deny':
+                    await self.complete_denial_flow(bug)
+                # Delete the queue message
+                await queue_msg.delete()
+            else:
+                # Someone revoked
+                await BugBotLogging.bot_log(f':clipboard: Report {report_id} received a revoke during final {stance} flow')
+
+                # Unlock the bug
+                bug.block_type = BugBlockType.none
+                bug.save()
+
+                # Rebuild the embed
+                em = ReportUtils.bug_to_embed(bug, self.bot)
+
+                # Update queue message with the new embed
+                queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
+                await queue_msg.edit(embed=em)
+        else:
+            # Rebuild the embed
+            em = ReportUtils.bug_to_embed(bug, self.bot)
+
+            # Update queue message with the new embed
+            queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
+            await queue_msg.edit(embed=em)
+
+    @commands.command()
+    @commands.guild_only()
+    async def approve(self, ctx, report_id: int, *, content: str):
+        await self.process_stance(ctx, report_id, content, 'approve')
+
+    @commands.command()
+    @commands.guild_only()
+    async def deny(self, ctx, report_id: int, *, content: str):
+        await self.process_stance(ctx, report_id, content, 'deny')
+
+    @commands.command()
+    @commands.guild_only()
+    @Checks.is_employee()
+    async def dapprove(self, ctx, report_id: int, * content: str):
+        await self.process_stance(ctx, report_id, content, 'approve', override=True)
+
+    @commands.command()
+    @commands.guild_only()
+    @Checks.is_employee()
+    async def ddeny(self, ctx, report_id: int, * content: str):
+        await self.process_stance(ctx, report_id, content, 'deny', override=True)
+
+    @commands.command()
+    @commands.guild_only()
+    async def revoke(self, ctx, report_id: int):
+        # Try and get their stance
+        clauses = [
+            (BugInfo.user == ctx.author.id),
+            (BugInfo.bug.id == report_id),
+            (BugInfo.type << [BugInfoType.can_reproduce, BugInfoType.can_not_reproduce])
+        ]
+        try:
+            stance = (BugInfo
+                      .select()
+                      .join(Bug)
+                      .where(reduce(operator.and_, clauses))
+                      .get())
+        except BugInfo.DoesNotExist:
+            stance = None
+
+        # Check we're in the bug approval queue
+        if ctx.channel.id != Configuration.get_master_var('BUGCHANNELS').get('QUEUE'):
+            reply = 'STANCE_WRONG_CHANNEL'
+        # Check if the stance exists
+        elif stance is None:
+            reply = 'NO_STANCE'
+        # Check if the bug is queued
+        elif stance.bug.state != BugState.queued:
+            reply = 'BUG_NOT_QUEUED'
+        else:
+            # Get the stance type
+            stance_type = 'approve' if stance.type == BugInfoType.can_reproduce else 'deny'
+            bug = stance.bug
+
+            # Delete the stance
+            stance.delete_instance()
+
+            # Remove XP
+            amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
+            ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)  # TODO: This needs to adjust their lifetime XP too or could be exploited
+
+            reply = 'REVOKED_STANCE'
+            await BugBotLogging.bot_log(f':wastebasket: {ctx.author} ({ctx.author.id}) revoked their stance on report {report_id}')
+
+            # Rebuild the embed
+            em = ReportUtils.bug_to_embed(bug, self.bot)
+
+            # Update queue message with the new embed
+            queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
+            await queue_msg.edit(embed=em)
+
+            # Dispatch revoke event (to cancel final approval flows)
+            data = {
+                'bug_id': bug.id,
+                'user_id': ctx.author.id,
+                'stance': stance_type
+            }
+            self.bot.dispatch('revoke', data)
+
+        await ctx.send(Configuration.get_var('strings', reply).format(user=ctx.author, report_id=report_id), delete_after=3.0)
+        await asyncio.sleep(3)
+        await ctx.message.delete()
 
     async def receive_report(self, report):
         # validation has already been done by the webserver so we don't need to bother doing that again here
@@ -250,6 +582,26 @@ class BugReporting:
                         await ExpUtils.award_bug_xp(self.bot, bug.trello_id, bug.trello_list, archived=data['data']['card'].get('closed', False))
                     elif data['type'] == 'addLabelToCard':
                         await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
+
+    @commands.command(name='bug')
+    @Checks.is_modinator()
+    async def _bugcommand(self, ctx: commands.Context, bugID: int):
+        try:
+            bug = Bug.get_by_id(bugID)
+        except:
+            await ctx.message.delete()
+            await BugBotLogging.bot_log(f"{Emoji.get_emoji('WARNING')} {ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but the bug ID specified does not even exist.")
+            return await ctx.send(f"{ctx.author.mention} I was unable to find any bug with the ID `{bugID}`.", delete_after=3.0)
+        platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
+        bug_embed = ReportUtils.bug_to_embed(bug, ctx.bot)
+        try:
+            await ctx.author.send(embed=bug_embed)
+        except discord.Forbidden:
+            await ctx.message.delete()
+            await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but their privacy settings are turned off.")
+            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.send} Your DM settings does not allow me to DM you.", delete_after=3.0)
+        await ctx.message.delete()
+        await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
 
 def setup(bot):
