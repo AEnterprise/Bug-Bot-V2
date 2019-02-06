@@ -8,19 +8,7 @@ from Utils import Checks
 class Announcement:
     def __init__(self,bot):
         self.bot = bot
-    
-    async def on_message(self, message):
-        if message.author.id == self.bot.user.id:
-            return
-        if message.channel.id not in Configuration.list_of_channels_ids():
-            return
-        if '<@&525464284759588866>' in message.content:
-            return
-        if '<@&524389656272437270>' in message.content:
-            role = Configuration.get_role("android")
-            await role.edit(mentionable=False)
-
-    
+ 
     async def _announce_log(self, ctx, role):
         await BugBotLogging.bot_log(f"{ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) pinged the **{role.name}** role!")
     async def _announce_update_log(self, ctx, channel):
