@@ -178,7 +178,7 @@ class BugReporting:
     async def submit(self, ctx: commands.Context, platform: str, title, steps, expected, actual, client, system):
         member = Configuration.get_tester(ctx.author.id)
         try:
-            sections = dict(title=title, steps=steps, expected=expected, actual=actual, client=client, system=system)
+            sections = dict(title=title, steps=steps, expected=expected, actual=actual, client_info=client, device_info=system)
             steps = sections['steps'].split(' - ')
             del steps[0]
             sections['steps'] = '\n'.join([f'{idx + 1}. {step}' for idx, step in enumerate(steps)])
@@ -387,11 +387,10 @@ class BugReporting:
         # Reply to the user
         await ctx.send(reply, delete_after=3.0)
 
-        # Delete their invoke message
-        await asyncio.sleep(3)
-        await ctx.message.delete()
-
         if err is not None:
+            # Delete their invoke message
+            await asyncio.sleep(3)
+            await ctx.message.delete()
             return
 
         # Get users who have a stance on the bug
@@ -440,6 +439,8 @@ class BugReporting:
                 # Update queue message with the new embed
                 queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
                 await queue_msg.edit(embed=em)
+            await asyncio.sleep(3)
+            await ctx.message.delete()
         else:
             # Rebuild the embed
             em = ReportUtils.bug_to_embed(bug, self.bot)
@@ -447,6 +448,8 @@ class BugReporting:
             # Update queue message with the new embed
             queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
             await queue_msg.edit(embed=em)
+            await asyncio.sleep(3)
+            await ctx.message.delete()
 
     @commands.command()
     @commands.guild_only()

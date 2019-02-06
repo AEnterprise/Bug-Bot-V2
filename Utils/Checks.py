@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ext.commands import CheckFailure
 
 from Utils import Configuration
 
@@ -47,7 +48,12 @@ def is_bug_hunter():
     return commands.check(predicate)
 
 
+class DMOnly(CheckFailure):
+    pass
+
 def dm_only():
     async def predicate(ctx):
-        return ctx.guild is None
+        if ctx.guild is None:
+            return True
+        raise DMOnly()
     return commands.check(predicate)

@@ -12,7 +12,7 @@ from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisMessager
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisMessager, Checks
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
@@ -71,32 +71,34 @@ async def keepDBalive():
 
 @bugbot.event
 async def on_command_error(ctx: commands.Context, error):
-    # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
-    # TODO: cleanup if any of these is in a reporting channel?
+    # lots of things can go wrong with commands, let's make sure we handle them nicely where appropriate
     if isinstance(error, commands.NoPrivateMessage):
-        await ctx.send("This command cannot be used in private messages.")
+        await ctx.send("This command cannot be used in private messages.", delete_after=10)
     elif isinstance(error, commands.BotMissingPermissions):
-        await ctx.send(error)
+        await ctx.send(error, delete_after=10)
+    elif isinstance(error, Checks.DMOnly):
+        await ctx.send("This command can only be used in DMs", delete_after=10)
     elif isinstance(error, commands.CheckFailure):
-        # TODO: do we want this or not?
-        await ctx.send(":lock: You do not have the required permissions to run this command")
+        await ctx.send(":lock: You do not have the required permissions to run this command", delete_after=10)
     elif isinstance(error, commands.CommandOnCooldown):
         # not sure if we're even gona have cooldowns, just here just in case
         await ctx.send(error)
     elif isinstance(error, commands.MissingRequiredArgument):
-        #
         param = list(ctx.command.params.values())[min(len(ctx.args) + len(ctx.kwargs), len(ctx.command.params))]
-        await ctx.send(f"{Emoji.get_chat_emoji('NO')} You are missing a required command argument: `{param.name}`\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`")
+        await ctx.send(f"{Emoji.get_chat_emoji('NO')} You are missing a required command argument: `{param.name}`\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`", delete_after=10)
     elif isinstance(error, commands.BadArgument):
         param = list(ctx.command.params.values())[min(len(ctx.args) + len(ctx.kwargs), len(ctx.command.params))]
-        await ctx.send(f"{Emoji.get_chat_emoji('NO')} Failed to parse the ``{param.name}`` param: ``{error}``\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`")
+        await ctx.send(f"{Emoji.get_chat_emoji('NO')} Failed to parse the ``{param.name}`` param: ``{error}``\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`", delete_after=10)
     elif isinstance(error, commands.CommandNotFound):
         return
 
     else:
         await handle_exception("Command execution failed", error.original, ctx=ctx)
         # notify caller
-        await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:")
+        await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:", delete_after=10)
+
+    await asyncio.sleep(10)
+    await ctx.message.delete()
 
 
 def extract_info(o):

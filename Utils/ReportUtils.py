@@ -118,7 +118,7 @@ def build_report_embed(data):
             emoji = Emoji.get_chat_emoji('DENY')
         elif x['type'] == 'note':
             emoji = ':pencil:'
-        interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): ||`{x["details"]}`||')
+        interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): || `{x["details"]}` ||')
     for x in data['attachments']:
         interactions.append(f':paperclip: **{x["username"]}** (`{x["id"]}`): {x["link"]}')
 
@@ -148,8 +148,8 @@ def bug_to_embed(bug, bot):
         'steps': bug.steps,
         'expected': bug.expected,
         'actual': bug.actual,
-        'client': bug.client_info,
-        'system': bug.device_info,
+        'client_info': bug.client_info,
+        'device_info': bug.device_info,
         'repros': [],
         'attachments': []
     }
