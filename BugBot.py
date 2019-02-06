@@ -231,8 +231,8 @@ if __name__ == '__main__':
     BugBotLogging.init_logger()
 
     clargs = parser.parse_args()
-    if 'gearbotlogin' in os.environ:
-        token = os.environ['gearbotlogin']
+    if 'bugbotlogin' in os.environ:
+        token = os.environ['bugbotlogin']
     elif clargs.token:
         token = clargs.token
     elif not Configuration.get_master_var("LOGIN_TOKEN", "0") is "0":

@@ -49,6 +49,9 @@ class BugReporting:
             return
         if message.channel.id not in Configuration.list_of_bugchannels_ids():
             return
+        for role in message.author.roles:
+            if role.id == Configuration.get_role('MODINATOR').id:
+                return
         ctx = await self.bot.get_context(message)
         if ctx.command is None:
             await message.channel.send(Configuration.get_var('strings', 'NON_COMMANDS_MSG').format(user=message.author.mention), delete_after=5)
@@ -579,6 +582,26 @@ class BugReporting:
                         await ExpUtils.award_bug_xp(self.bot, bug.trello_id, bug.trello_list, archived=data['data']['card'].get('closed', False))
                     elif data['type'] == 'addLabelToCard':
                         await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
+
+    @commands.command(name='bug')
+    @Checks.is_modinator()
+    async def _bugcommand(self, ctx: commands.Context, bugID: int):
+        try:
+            bug = Bug.get_by_id(bugID)
+        except:
+            await ctx.message.delete()
+            await BugBotLogging.bot_log(f"{Emoji.get_emoji('WARNING')} {ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but the bug ID specified does not even exist.")
+            return await ctx.send(f"{ctx.author.mention} I was unable to find any bug with the ID `{bugID}`.", delete_after=3.0)
+        platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
+        bug_embed = ReportUtils.bug_to_embed(bug, ctx.bot)
+        try:
+            await ctx.author.send(embed=bug_embed)
+        except discord.Forbidden:
+            await ctx.message.delete()
+            await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but their privacy settings are turned off.")
+            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.send} Your DM settings does not allow me to DM you.", delete_after=3.0)
+        await ctx.message.delete()
+        await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
 
 def setup(bot):
