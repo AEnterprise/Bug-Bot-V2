@@ -584,6 +584,7 @@ class BugReporting:
                         await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
 
     @commands.command(name='bug')
+    @Checks.is_modinator()
     async def _bugcommand(self, ctx: commands.Context, bugID: int):
         try:
             bug = Bug.get_by_id(bugID)
