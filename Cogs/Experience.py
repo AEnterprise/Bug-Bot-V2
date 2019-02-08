@@ -292,6 +292,10 @@ class Experience:
         if amount < 1:
             await ctx.send('XP amount cannot be less than 1')
         else:
+            balance = ExpUtils.get_xp(user.id)
+            # Remove all XP if we're taking more than they have
+            if amount > balance:
+                amount = balance
             balance = ExpUtils.remove_xp(user.id, amount, ctx.author.id, TransactionEvent.xp_taken)
             await BugBotLogging.bot_log(f':moneybag: {ctx.author} removed {amount} XP from {user} (`{user.id}`). Their new balance is {balance} XP')
             await ctx.send(f'Removed {amount} XP from {user}. New balance is {balance} XP', delete_after=5.0)

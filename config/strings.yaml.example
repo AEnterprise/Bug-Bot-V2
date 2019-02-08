@@ -29,8 +29,13 @@ NO_STANCE: "{user.mention}, you don't have a stance on report {report_id}"
 SELF_APPROVE_DISALLOWED: "{user.mention}, you aren't allowed to approve your own report"
 BUG_LOCKED: "{user.mention}, you aren't allowed to interact with this report"
 BUG_NOT_QUEUED: "{user.mention}, that report has already been moved from the queue"
+BUG_NOT_APPROVED: "{user.mention}, you can only use that command on an approved report"
+REPRO_DEAD_BUG: "{user.mention}, that report has been marked as dead. Please check on Trello to see if there's an alternative ticket"
 INVALID_REPORT_ID: "{user.mention}, I didn't recognise that report ID"
 STANCE_WRONG_CHANNEL: "{user.mention}, you can only use that command in the <#253923313460445184>!"
+REPRO_WRONG_CHANNEL: "{user.mention}, you can only use that command in a bug reporting channel"
+REPRO_BLACKLISTED: "{user.mention}, using wording like 'latest' doesn't give us any useful information to work with. Please review #faqs to see how to find your client and device information"
+REPRO_ADDED: "{user.mention}, your repro has been added to the ticket!"
 BUG_APPROVED: "Congratulations! Your bug {trello_link} (report #{report_id}) has been approved! Don't forget to vote on the severity and have a great day!"
 TRELLO_CONTENT: |-
   Reported by {reporter}
@@ -47,8 +52,8 @@ TRELLO_CONTENT: |-
   {bug.device_info}
   
   Report ID: {bug.id}
-TRELLO_CANREPRO: |-
-  Can reproduce
+TRELLO_REPRO: |-
+  {stance}
   {content}
   
   {user}
