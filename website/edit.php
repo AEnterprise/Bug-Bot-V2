@@ -68,7 +68,6 @@
         </div>
         <div>
         <script type="text/javascript">
-          <script>
            var bug = <?php echo $bugid ?>;
             $(document).ready(function(){
                 $.getJSON('./bugbot/bugs/'+bug, function(data) {
@@ -79,12 +78,10 @@
                   document.getElementById('client_info').value = data.client_info;
                   document.getElementById('device_info').value = data.device_info;
                   document.getElementById('platform').value = data.platform;
-                  document.getElementById('user_id').value = data.user_id;
                 });
             });
 
 
-            </script>
         </script>
           <center><form action="./handle_edit.php" method="POST">
             <label name="title" >In a single sentence, describe your bug like you're telling a friend about it.</label><br>
@@ -108,8 +105,8 @@
                   <option value="store">store</option>
                   <option value="marketing">marketing</option>
               </select>
-            <input name="user_id" id="user_id" type="hidden" value="<?=$id?>">
-            <input name="bugid" id="bug_id" type="hidden" value="<?=$bugid?>">
+            <input name="user_id" id="user_id" type="hidden" value="<?=$id ?>">
+            <input name="bug_id" id="bug_id" type="hidden" value="<?=$bugid?>">
               <br/>
               <br/>
               <br/>

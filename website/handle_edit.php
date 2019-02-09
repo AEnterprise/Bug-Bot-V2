@@ -1,8 +1,9 @@
 <?php
 $asd = $_POST;
 $configs = include('config.php');
-$service_url = $configs->bugedit_url + $_POST['bug_id'];
+$service_url = $configs->bugedit_url . $_POST['bug_id'];
 $curl = curl_init($service_url);
+unset($_POST["bug_id"]);
 $curl_post_data = json_encode($_POST);
 print_r($_POST);
 print("<br/>");

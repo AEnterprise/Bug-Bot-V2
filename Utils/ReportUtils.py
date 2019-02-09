@@ -123,7 +123,7 @@ def build_report_embed(data):
             repro_counts[x['type']] += 1
         if repro_counts[x['type']] > 5:
             continue
-        interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): || `{x["details"]}` ||')
+        interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): `{x["details"]}`')
     for x in data['attachments']:
         interactions.append(f':paperclip: **{x["username"]}** (`{x["id"]}`): {x["link"]}')
 

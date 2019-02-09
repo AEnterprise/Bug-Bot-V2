@@ -236,5 +236,6 @@ if __name__ == '__main__':
     else:
         token = input("Please enter your Discord token: ")
     BugBotLogging.info("BugBot taking off to collect the bugs!")
+    bugbot.lockdown = False
     bugbot.run(token)
     BugBotLogging.info("Time for a nap, bugs will still be here later")

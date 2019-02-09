@@ -11,6 +11,7 @@ import BugBot
 from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpUtils
 
 from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
+from Utils.Converters import BugReport
 from Utils.DataUtils import Storeinfo, Bug, BugInfo
 from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
 from Utils.ReportUtils import BugReportException
@@ -30,20 +31,7 @@ def platform_convert(platform):
         return [Platforms.android, '-a']
 
 
-class BugReport(commands.Converter):
-    async def convert(self, ctx, argument):
-        if argument.isnumeric():
-            bug = Bug.get_or_none(id=argument)
-        else:
-            search = re.search(r'https?://trello\.com/c/(\w+)', argument)
-            if search:
-                shortlink = search.group(1)
-            else:
-                shortlink = argument
-            bug = Bug.get_or_none(trello_id=shortlink)
-        if bug is None:
-            raise commands.BadArgument(f'Report "{argument}" not found')
-        return bug
+
 
 
 class BugReporting:
