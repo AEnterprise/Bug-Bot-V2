@@ -2,7 +2,7 @@ import re
 import asyncio
 import operator
 from functools import reduce
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import discord
 from discord.ext import commands
@@ -26,6 +26,22 @@ def platform_convert(platform):
         return [Platforms.linux, '-L']
     elif platform.lower() == '-a':
         return [Platforms.android, '-a']
+
+
+class BugReport(commands.Converter):
+    async def convert(self, ctx, argument):
+        if argument.isnumeric():
+            bug = Bug.get_or_none(id=argument)
+        else:
+            search = re.search(r'https?://trello\.com/c/(\w+)', argument)
+            if search:
+                shortlink = search.group(1)
+            else:
+                shortlink = argument
+            bug = Bug.get_or_none(trello_id=shortlink)
+        if bug is None:
+            raise commands.BadArgument(f'Report "{argument}" not found')
+        return bug
 
 
 class BugReporting:
@@ -204,7 +220,7 @@ class BugReporting:
                 response = e.code.name
             await ctx.send(response)
         else:
-            await BugBotLogging.bot_log(f':clipboard: {ctx.author} ({ctx.author.id}) submitted a new report ({report_id})')
+            await BugBotLogging.bot_log(f':clipboard: {ctx.author} (`{ctx.author.id}`) submitted a new report ({report_id})')
             await ctx.send(Configuration.get_var('strings', 'REPORT_SUBMITTED').format(user=ctx.author))
 
     def sub_storeinfo(self, content, user_id):
@@ -226,7 +242,7 @@ class BugReporting:
         # Give initial XP for approval
         amount = Configuration.get_var('bugbot', 'XP').get('APPROVED_BUG', 5)
         ExpUtils.add_xp(bug.reporter, amount, self.bot.user.id, TransactionEvent.bug_approved)
-        await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter} ({reporter.id}) for an approved bug')
+        await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter} (`{reporter.id}`) for an approved bug')
 
         # Build the Trello content
         content = Configuration.get_var('strings', 'TRELLO_CONTENT').format(reporter=reporter, bug=bug)
@@ -258,7 +274,7 @@ class BugReporting:
         # Add approvals to Trello
         for i in bug.info:
             if i.type == BugInfoType.can_reproduce:
-                repro = Configuration.get_var('strings', 'TRELLO_CANREPRO').format(content=i.content, user=self.bot.get_user(i.user))
+                repro = Configuration.get_var('strings', 'TRELLO_REPRO').format(stance='Can reproduce', content=i.content, user=self.bot.get_user(i.user))
                 comment_id = await self.bot.trello.add_comment(trello_id, repro)
                 i.trello_id = comment_id
                 i.save()
@@ -281,7 +297,7 @@ class BugReporting:
                 bh_cog = self.bot.get_cog('BugHunter')
                 await bh_cog.make_initiate(reporter)  # FIXME: They won't get informed if they're already an initiate
 
-    async def complete_denial_flow(self, bug):
+    async def complete_denial_flow(self, bug, selfdeny=False):
         # Set extra details in the DB
         bug.block_type = BugBlockType.none
         bug.state = BugState.denied
@@ -311,7 +327,7 @@ class BugReporting:
 
         # DM the reporter
         reporter = self.bot.get_user(bug.reporter)
-        if reporter is not None:
+        if reporter is not None and not selfdeny:
             reasons = []
             denials = [i for i in bug.info if i.type == BugInfoType.can_not_reproduce]
             for idx, i in enumerate(denials):
@@ -386,7 +402,7 @@ class BugReporting:
                 reply = 'STANCE_CHANGED'
                 log_suffix = ' (updated stance)'
 
-            await BugBotLogging.bot_log(f'{emoji} {ctx.author} ({ctx.author.id}) {action} report {report_id}{log_suffix}')
+            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) {action} report {report_id}{log_suffix}')
 
         # Get the response string
         if err is not None:
@@ -407,7 +423,9 @@ class BugReporting:
         users = [i.user for i in bug.info if i.type == stance_type]
 
         # If they denied their own bug, set the required stance override
+        selfdeny = False
         if stance == 'deny' and ctx.author.id == bug.reporter:
+            selfdeny = True
             override = True
 
         # If we're in the final approval/denial flow
@@ -432,7 +450,7 @@ class BugReporting:
                 if stance == 'approve':
                     await self.complete_approval_flow(bug)
                 elif stance == 'deny':
-                    await self.complete_denial_flow(bug)
+                    await self.complete_denial_flow(bug, selfdeny)
                 # Delete the queue message
                 await queue_msg.delete()
             else:
@@ -515,11 +533,11 @@ class BugReporting:
             stance.delete_instance()
 
             # Remove XP
-            amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
-            ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)  # TODO: This needs to adjust their lifetime XP too or could be exploited
+            # amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
+            # ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)  # TODO: This needs to adjust their lifetime XP too or could be exploited
 
             reply = 'REVOKED_STANCE'
-            await BugBotLogging.bot_log(f':wastebasket: {ctx.author} ({ctx.author.id}) revoked their stance on report {report_id}')
+            await BugBotLogging.bot_log(f':wastebasket: {ctx.author} (`{ctx.author.id}`) revoked their stance on report {report_id}')
 
             # Rebuild the embed
             em = ReportUtils.bug_to_embed(bug, self.bot)
@@ -539,6 +557,92 @@ class BugReporting:
         await ctx.send(Configuration.get_var('strings', reply).format(user=ctx.author, report_id=report_id), delete_after=3.0)
         await asyncio.sleep(3)
         await ctx.message.delete()
+
+    async def process_trello_repro(self, ctx, bug, content, stance):
+
+        # Check we're in a bug reporting channel
+        if ctx.channel.id not in Configuration.get_master_var('BUGCHANNELS').values():
+            reply = 'REPRO_WRONG_CHANNEL'
+
+        # Check if the bug is approved
+        elif bug.state != BugState.approved:
+            reply = 'BUG_NOT_APPROVED'
+
+        # Check the bug is not dead
+        elif bug.trello_list in Configuration.get_var('bugbot', 'TRELLO')['DEAD_BUG_LISTS']:
+            reply = 'REPRO_DEAD_BUG'
+
+        # Check if the word 'latest' is in the repro content
+        elif 'latest' in content.lower():
+            reply = 'REPRO_BLACKLISTED'
+
+        else:
+            # Remove markdown from the content
+            content = Utils.escape_markdown(content)
+
+            # Set stance vars
+            if stance == 'canrepro':
+                stance_type = BugInfoType.can_reproduce
+                xp_event = TransactionEvent.can_repro
+                trello_stance = 'Can reproduce'
+                emoji = ':thumbsup:'
+            elif stance == 'cannotrepro':
+                stance_type = BugInfoType.can_not_reproduce
+                xp_event = TransactionEvent.cannot_repro
+                trello_stance = 'Cannot reproduce'
+                emoji = ':thumbsdown:'
+
+            # Add/edit their stance and push to Trello
+            repro = Configuration.get_var('strings', 'TRELLO_REPRO').format(stance=trello_stance, content=content, user=ctx.author)
+            stance_obj = BugInfo.get_or_none(BugInfo.user == ctx.author.id, BugInfo.bug == bug, BugInfo.type << [BugInfoType.can_reproduce, BugInfoType.can_not_reproduce])
+            if stance_obj is not None and datetime.utcnow() < (stance_obj.added + timedelta(days=1)):
+                # Has a stance that can be edited
+                stance_obj.content = content
+                stance_obj.type = stance_type
+                stance_obj.added = datetime.utcnow()
+                stance_obj.save()
+                await self.bot.trello.edit_comment(bug.trello_id, stance_obj.trello_id, repro)
+            else:
+                # Add a new stance
+                comment_id = await self.bot.trello.add_comment(bug.trello_id, repro)
+                BugInfo.create(user=ctx.author.id, content=content, bug=bug, type=stance_type, trello_id=comment_id)
+
+            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) added a {stance} to report `{bug.trello_id}` ({bug.id})')
+
+            # Unarchive the card (if it isn't already on the board)
+            # await self.bot.trello.unarchive_card(bug.trello_id)  # TODO: Only unarchive if auto-archived
+
+            # Regenerate the embed
+            em = ReportUtils.bug_to_embed(bug, self.bot)
+
+            # Update message with the new embed
+            msg = await Configuration.get_bugchannel(bug.platform.name).get_message(bug.msg_id)
+            try:
+                await msg.edit(embed=em)
+            except discord.HTTPException:
+                pass
+
+            # Give them some XP (if eligible)
+            if Configuration.get_role('BUG_HUNTER') in ctx.author.roles and ctx.author.id != bug.reporter and stance_obj is None:
+                exp_cog = self.bot.get_cog('Experience')
+                await exp_cog.give_repro_xp(ctx.author.id, xp_event)
+
+            reply = 'REPRO_ADDED'
+
+        # Respond to the user
+        await ctx.send(Configuration.get_var('strings', reply).format(user=ctx.author), delete_after=3.0)
+        await asyncio.sleep(3)
+        await ctx.message.delete()
+
+    @commands.command(aliases=['cr'])
+    @commands.guild_only()
+    async def canrepro(self, ctx, bug: BugReport, *, content: str):
+        await self.process_trello_repro(ctx, bug, content, 'canrepro')
+
+    @commands.command(aliases=['cnr', 'cantrepro'])
+    @commands.guild_only()
+    async def cannotrepro(self, ctx, bug: BugReport, *, content: str):
+        await self.process_trello_repro(ctx, bug, content, 'cannotrepro')
 
     async def receive_report(self, report):
         # validation has already been done by the webserver so we don't need to bother doing that again here
