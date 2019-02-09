@@ -47,7 +47,7 @@ def validate_report(report, require_all=True):
             raise BugReportException(ReportError.links_detected, name)
         if len(r) > 1024:
             raise BugReportException(ReportError.length_exceeded, name)
-    blacklist = [x for x in Configuration.get_var('bugbot', 'BUG_TEXT_BLACKLIST') if x in report['title'].lower() or x in report[ 'actual'].lower()]  # FIXME: This matches within words so will catch 'buggy'...etc
+    blacklist = [x for x in Configuration.get_var('bugbot', 'BUG_TEXT_BLACKLIST') if x in report['title'].lower() or x in report['actual'].lower()]  # FIXME: This matches within words so will catch 'buggy'...etc
     if len(blacklist) > 0:
         raise BugReportException(ReportError.blacklisted_words, ', '.join(blacklist))
 
@@ -110,6 +110,7 @@ def build_report_embed(data):
     if 'trello_id' in data:
         em.add_field(name='Trello', value=f'https://trello.com/c/{data["trello_id"]}', inline=False)
 
+    repro_counts = {'can_reproduce': 0, 'can_not_reproduce': 0}
     interactions = []
     for x in reversed(data['repros']):
         if x['type'] == 'can_reproduce':
@@ -118,12 +119,16 @@ def build_report_embed(data):
             emoji = Emoji.get_chat_emoji('DENY')
         elif x['type'] == 'note':
             emoji = ':pencil:'
+        if x['type'] in repro_counts:
+            repro_counts[x['type']] += 1
+        if repro_counts[x['type']] > 5:
+            continue
         interactions.append(f'{emoji} **{x["username"]}** (`{x["id"]}`): || `{x["details"]}` ||')
     for x in data['attachments']:
         interactions.append(f':paperclip: **{x["username"]}** (`{x["id"]}`): {x["link"]}')
 
     if len(interactions) > 0:
-        em.add_field(name='---', value='\n'.join(interactions), inline=False)
+        em.add_field(name=chr(8203), value='\n'.join(interactions), inline=False)
 
     return em
 
