@@ -97,7 +97,7 @@
 	  	document.getElementById("edit").addEventListener("click", function(event){
 		  event.preventDefault()
 		  var bugid = prompt("Please enter Bug ID", "");
-		  window.location.replace("./edit.php?bug=" + bugid);
+    window.location.replace("./edit.php?bug=" + bugid + "&user=<?=$id?>");
 
 		});
 	  </script>
