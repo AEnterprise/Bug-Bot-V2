@@ -27,8 +27,7 @@ async def trello(request):
     # TODO: Could also verify the signature
     if request.method == 'POST':
         data = await request.json()
-        # FIXME: BROKEN, DON'T FORGET TO FIX!
-        await request.app.redis.send('trello', data['action'])
+        await request.app.redis.send('process_trello_event', data['action'])
     return web.Response()
 
 

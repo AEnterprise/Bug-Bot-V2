@@ -629,27 +629,6 @@ class BugReporting:
     async def cannotrepro(self, ctx, bug: BugReport, *, content: str):
         await self.process_trello_repro(ctx, bug, content, 'cannotrepro')
 
-    async def process_trello_event(self, data):
-        card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']
-        if data['type'] in card_events:
-            bug = Bug.get_or_none(Bug.trello_id == data['data']['card']['shortLink'])
-            if bug is not None:
-                bug.last_activity = datetime.utcnow()
-                if 'listAfter' in data['data']:
-                    bug.trello_list = data['data']['listAfter']['id']
-                elif 'list' in data['data']:
-                    bug.trello_list = data['data']['list']['id']
-                bug.save()
-                if data['type'] == 'commentCard':
-                    pass
-                    # If a dev/engineer commented on the card (backlog feature)
-                    # if data['idMemberCreator'] in Configuration.get_var('bugbot', 'dev_trello_ids'):
-                    #    pass
-                if not bug.xp_awarded:
-                    if data['type'] == 'updateCard':
-                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, bug.trello_list, archived=data['data']['card'].get('closed', False))
-                    elif data['type'] == 'addLabelToCard':
-                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
 
     @commands.command(name='bug')
     @Checks.is_modinator()

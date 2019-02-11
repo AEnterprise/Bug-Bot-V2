@@ -73,3 +73,7 @@ class Messager:
         reply = self.replies[uid]
         del self.replies[uid]
         return reply
+
+    async def send(self, type, data):
+        data["type"] = type
+        await self.conn.publish_json(self.outbound, data)

@@ -1,10 +1,11 @@
 import json
+from datetime import datetime
 
 import aioredis
 from aioredis.pubsub import Receiver
 
 import BugBot
-from Utils import Configuration, BugBotLogging, ReportUtils, Checks
+from Utils import Configuration, BugBotLogging, ReportUtils, Checks, ExpUtils
 from Utils.DataUtils import Bug
 from Utils.Enums import ReportSource, Platforms
 
@@ -22,6 +23,9 @@ class WebLink:
             user_reports=self.user_reports,
             get_bug=self.get_bug,
             patch_bug=self.patch_bug
+        )
+        self.no_reply_handlers = dict(
+            process_trello_event=self.process_trello_event
         )
         self.task = self._receiver()
 
@@ -52,7 +56,8 @@ class WebLink:
     async def _receiver(self):
         async for sender, message in self.receiver.iter(encoding='utf-8', decoder=json.loads):
             try:
-                reply = dict(reply=await self.handlers[message["type"]](message), uid=message["uid"])
+                handler = self.handlers[message["type"]] if message["type"] in self.handlers else self.no_reply_handlers[message["type"]]
+                reply = dict(reply=await handler(message), uid=message["uid"])
                 await self.redis_link.publish_json("bot-web-messages", reply)
             except Exception as e:
                 await BugBot.handle_exception("Dash message handling", e, None, None, None, None, message)
@@ -143,6 +148,28 @@ class WebLink:
         bug.save()
         await ReportUtils.update_bug(bug, self.bot)
         return dict(status=200, data=dict(updated=True))
+
+    async def process_trello_event(self, data):
+        card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']
+        if data['type'] in card_events:
+            bug = Bug.get_or_none(Bug.trello_id == data['data']['card']['shortLink'])
+            if bug is not None:
+                bug.last_activity = datetime.utcnow()
+                if 'listAfter' in data['data']:
+                    bug.trello_list = data['data']['listAfter']['id']
+                elif 'list' in data['data']:
+                    bug.trello_list = data['data']['list']['id']
+                bug.save()
+                if data['type'] == 'commentCard':
+                    pass
+                    # If a dev/engineer commented on the card (backlog feature)
+                    # if data['idMemberCreator'] in Configuration.get_var('bugbot', 'dev_trello_ids'):
+                    #    pass
+                if not bug.xp_awarded:
+                    if data['type'] == 'updateCard':
+                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, bug.trello_list, archived=data['data']['card'].get('closed', False))
+                    elif data['type'] == 'addLabelToCard':
+                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
 
 
 def setup(bot):
