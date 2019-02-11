@@ -29,14 +29,18 @@ def create_hunter(user_id):
     return BugHunter.create(id=user_id, hunter_at=datetime.utcnow())
 
 
-def add_xp(user_id, amount, initiator_id, event):
+async def add_xp(user_id, amount, initiator_id, event):
     try:
         hunter = BugHunter.get_by_id(user_id)
     except BugHunter.DoesNotExist:
         hunter = create_hunter(user_id)
     hunter.xp += amount
+    old_lt_xp = hunter.lifetime_xp
+    hunter.lifetime_xp += amount
     hunter.save()
     Transaction.create(hunter=hunter, xp_change=amount, initiator=initiator_id, event=event)
+    if old_lt_xp < Configuration.get_var('bugbot', 'BADGE_REQUIREMENT') <= hunter.lifetime_xp:
+        await Configuration.get_channel('PRIZE_LOG').send(f':tada: **<@{user_id}>** earned the Bug Hunter Badge!')
     return hunter.xp
 
 
@@ -54,11 +58,22 @@ def remove_xp(user_id, amount, initiator_id, event):
         return hunter.xp
 
 
+def remove_lifetime_xp(user_id, amount):
+    hunter = BugHunter.get_or_none(id=user_id)
+    if hunter is not None:
+        if amount > hunter.lifetime_xp:
+            amount = hunter.lifetime_xp
+        hunter.lifetime_xp -= amount
+        hunter.save()
+
+
 def get_xp(user_id):
     try:
-        return BugHunter.get_by_id(user_id).xp
+        hunter = BugHunter.get_by_id(user_id)
     except BugHunter.DoesNotExist:
-        return 0
+        return (0, 0)
+    else:
+        return (hunter.xp, hunter.lifetime_xp)
 
 
 def get_xp_pending_bugs():
@@ -94,7 +109,7 @@ async def award_bug_xp(bot, trello_id, list_id=None, label_ids=[], archived=Fals
             if any([x for x in label_ids if x in data['LABELS']]):
                 amount = Configuration.get_var('bugbot', 'XP').get('VERIFIED_BUG') + data['XP_BONUS']
                 priority = int(severity[-1])
-                add_xp(bug.reporter, amount, bot.user.id, TransactionEvent.bug_verified)
+                await add_xp(bug.reporter, amount, bot.user.id, TransactionEvent.bug_verified)
                 bug.xp_awarded = True
                 bug.priority = priority
                 if list_id is not None:
