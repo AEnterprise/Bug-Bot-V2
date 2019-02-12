@@ -52,6 +52,7 @@ class TransactionEvent(Enum):
     xp_taken = 12
     purchase = 13
     bug_approved = 14
+    revoke_spent_xp = 15
 
 
 class ReportError(Enum):

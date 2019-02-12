@@ -224,7 +224,7 @@ class BugReporting:
 
         # Give initial XP for approval
         amount = Configuration.get_var('bugbot', 'XP').get('APPROVED_BUG', 5)
-        ExpUtils.add_xp(bug.reporter, amount, self.bot.user.id, TransactionEvent.bug_approved)
+        await ExpUtils.add_xp(bug.reporter, amount, self.bot.user.id, TransactionEvent.bug_approved)
         await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter} (`{reporter.id}`) for an approved bug')
 
         # Build the Trello content
@@ -519,8 +519,15 @@ class BugReporting:
             stance.delete_instance()
 
             # Remove XP
-            # amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
-            # ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, TransactionEvent.revoke)
+            if bug.reporter != ctx.author.id:
+                amount = Configuration.get_var('bugbot', 'XP').get('QUEUE_REPRO', 0)
+                ExpUtils.remove_lifetime_xp(ctx.author.id, amount)
+                balance = ExpUtils.get_xp(ctx.author.id)[0]
+                revoke_type = TransactionEvent.revoke
+                if amount > balance:
+                    revoke_type = TransactionEvent.revoke_spent_xp
+                    amount = balance
+                ExpUtils.remove_xp(ctx.author.id, amount, self.bot.user.id, revoke_type)
 
             reply = 'REVOKED_STANCE'
             await BugBotLogging.bot_log(f':wastebasket: {ctx.author} (`{ctx.author.id}`) revoked their stance on report {report_id}')
@@ -647,7 +654,7 @@ class BugReporting:
         except discord.Forbidden:
             await ctx.message.delete()
             await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but their privacy settings are turned off.")
-            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.send} Your DM settings does not allow me to DM you.", delete_after=3.0)
+            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.mention} Your DM settings does not allow me to DM you.", delete_after=3.0)
         await ctx.message.delete()
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
