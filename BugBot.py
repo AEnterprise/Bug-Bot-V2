@@ -60,7 +60,7 @@ async def on_ready():
         await restart_cleanup()
         await BugBotLogging.bot_log("Here we go!")
         bugbot.STARTUP_COMPLETE = True
-    # we got the ready event, usually means we resumed, make sure the status is still there
+    # we got the ready event, usually means we identified, make sure the status is still there
     await bugbot.change_presence(activity=Activity(type=3, name='over the bug boards'))
 
 
@@ -72,7 +72,7 @@ async def keepDBalive():
 
 @bugbot.event
 async def on_command_error(ctx: commands.Context, error):
-    # lots of things can go wrong with commands, let's make sure we handle them nicely where appropriate
+    # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
     if isinstance(error, commands.NoPrivateMessage):
         await ctx.send("This command cannot be used in private messages.", delete_after=10)
     elif isinstance(error, commands.BotMissingPermissions):
