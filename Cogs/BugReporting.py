@@ -703,7 +703,7 @@ class BugReporting:
         except discord.Forbidden:
             await ctx.message.delete()
             await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but their privacy settings are turned off.")
-            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.send} Your DM settings does not allow me to DM you.", delete_after=3.0)
+            return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.mention} Your DM settings does not allow me to DM you.", delete_after=3.0)
         await ctx.message.delete()
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
