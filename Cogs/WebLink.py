@@ -56,9 +56,13 @@ class WebLink:
     async def _receiver(self):
         async for sender, message in self.receiver.iter(encoding='utf-8', decoder=json.loads):
             try:
-                handler = self.handlers[message["type"]] if message["type"] in self.handlers else self.no_reply_handlers[message["type"]]
-                reply = dict(reply=await handler(message), uid=message["uid"])
-                await self.redis_link.publish_json("bot-web-messages", reply)
+                print(message["type"])
+                if message["type"] in self.handlers:
+                    reply = dict(reply=await self.handlers[message["type"]](message), uid=message["uid"])
+                    await self.redis_link.publish_json("bot-web-messages", reply)
+                else:
+                    await self.no_reply_handlers[message["type"]](message)
+
             except Exception as e:
                 await BugBot.handle_exception("Dash message handling", e, None, None, None, None, message)
 
@@ -150,6 +154,7 @@ class WebLink:
         return dict(status=200, data=dict(updated=True))
 
     async def process_trello_event(self, data):
+        print("got the call")
         card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']
         if data['type'] in card_events:
             bug = Bug.get_or_none(Bug.trello_id == data['data']['card']['shortLink'])

@@ -4,7 +4,7 @@ import asyncio
 import re
 from collections import namedtuple
 
-from discord import Embed, Forbidden, NotFound
+from discord import Embed, Forbidden, NotFound, utils
 
 from Utils import Configuration, Utils, Emoji, Checks, BugBotLogging
 from Utils.DataUtils import Bug, BugInfo

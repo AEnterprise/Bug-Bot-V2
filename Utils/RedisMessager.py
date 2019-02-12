@@ -75,5 +75,6 @@ class Messager:
         return reply
 
     async def send(self, type, data):
+        print(f"redismessage sending as {type}")
         data["type"] = type
         await self.conn.publish_json(self.outbound, data)
