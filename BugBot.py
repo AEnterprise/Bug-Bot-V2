@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 
 import aiohttp
+import aioredis
 from discord import Activity, Embed, Colour
 from discord.abc import PrivateChannel
 from discord.ext import commands
@@ -220,6 +221,16 @@ async def handle_exception(exception_type, exception, event=None, message=None, 
         BugBotLogging.error(traceback.format_exc())
 
 
+async def connect_redis():
+        try:
+            redis_info = Configuration.get_master_var("REDIS", dict(host="localhost", port=6379))
+            bugbot.redis_link = await aioredis.create_redis_pool(
+                (redis_info["host"], redis_info["port"]),
+                encoding="utf-8", db=3)  # size 2: one send, one receive
+            BugBotLogging.info("Redis link esatablished")
+        except OSError:
+            await BugBotLogging.bot_log("Failed to connect to the redis!")
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--token", help="Specify your Discord token")
@@ -237,5 +248,6 @@ if __name__ == '__main__':
         token = input("Please enter your Discord token: ")
     BugBotLogging.info("BugBot taking off to collect the bugs!")
     bugbot.lockdown = False
+    bugbot.loop.create_task(connect_redis())
     bugbot.run(token)
     BugBotLogging.info("Time for a nap, bugs will still be here later")

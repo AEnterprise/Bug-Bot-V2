@@ -1,12 +1,15 @@
 # Validators: return error message on fail, empty string on pass
 # probably a better way to do this, but this works pretty good for now
+import asyncio
 import re
+from collections import namedtuple
 
 from discord import Embed, Forbidden, NotFound
 
-from Utils import Configuration, Utils, Emoji
-from Utils.DataUtils import Bug
+from Utils import Configuration, Utils, Emoji, Checks, BugBotLogging
+from Utils.DataUtils import Bug, BugInfo
 from Utils.Enums import Platforms, ReportError, BugInfoType, BugBlockType, BugState
+from Utils.Trello import TrelloUtils
 
 
 class BugReportException(Exception):
@@ -210,4 +213,48 @@ async def update_bug(bug, bot):
         message = await channel.get_message(bug.msg_id)
         await message.edit(embed=bug_to_embed(bug, bot))
     except (Forbidden, NotFound):
-        pass
+        BugBotLogging.info(f"Failed to update {bug.id} on discord")
+
+
+async def add_attachment(bug, bot, user, link, message=None):
+    if Checks.is_hunter(user):
+        await real_add_attachment(bug, bot, user, link, user, message)
+    else:
+        channel = Configuration.get_channel("ATTACHMENTS")
+        embed = Embed(description=f"{Utils.escape_markdown(str(user))} wants to attach {link} to #{bug.id}")
+        message = await channel.send(embed=embed)
+        await message.add_reaction(Emoji.get_emoji("APPROVE"))
+        await message.add_reaction(Emoji.get_emoji("DENY"))
+        await bot.redis_connection.hmset_dict(
+            message.id,
+            bug=bug.id,
+            user=user.id,
+            link=link
+        )
+
+
+async def real_add_attachment(bug, bot, user, link, approved_by, message):
+    # skip the queue
+    trello_id = None
+    if bug.trello_id is not None:
+        trello_id = await bot.trello.add_attachment(bug.trello_id, str(user), link)
+    BugInfo.create(user=user.id, content=link, bug=bug, type=BugInfoType.attachment, trello_id=trello_id)
+    await update_bug(bug, bot)
+    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id} (approved by {Utils.escape_markdown(str(approved_by))}")
+    if message is not None:
+        await message.channel.send(f"{user.mention} Your attachment was added to #{bug.id}", delete_after=5)
+        await asyncio.sleep(5)
+        await message.delete()
+
+
+async def remove_attachment(bug, bot, user, link):
+    info = BugInfo.get_or_none(bug=bug.id, content=link)
+    if info is None:
+        return "I could not find that link attached to that bug"
+    else:
+        if info.trello_id is not None:
+            await  bot.trello.remove_attachment(bug.trello_id, info.trello_id)
+        info.delete_instance()
+        await update_bug(bug, bot)
+        await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} detached <{link}> from #{bug.id}")
+        return "Attachment removed"

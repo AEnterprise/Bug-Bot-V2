@@ -5,17 +5,18 @@ from functools import reduce
 from datetime import datetime, timedelta
 
 import discord
+from discord import RawReactionActionEvent
 from discord.ext import commands
 
 import BugBot
 from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpUtils
 
 from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
-from Utils.Converters import BugReport
+from Utils.Converters import BugReport, Link
 from Utils.DataUtils import Storeinfo, Bug, BugInfo
 from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
-from Utils.ReportUtils import BugReportException
-from Utils.Trello import TrelloException
+from Utils.ReportUtils import BugReportException, QueuedAttachment
+from Utils.Trello import TrelloException, TrelloUtils
 
 
 def platform_convert(platform):
@@ -649,6 +650,38 @@ class BugReporting:
             return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.send} Your DM settings does not allow me to DM you.", delete_after=3.0)
         await ctx.message.delete()
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
+
+    @commands.command()
+    async def attach(self, ctx, bug:BugReport, link:Link):
+        await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
+
+    @Checks.is_bug_hunter()
+    @commands.command()
+    async def detach(self, ctx, bug: BugReport, link: Link):
+        message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
+        await ctx.send(message, delete_after=5)
+        await asyncio.sleep(5)
+        await message.delete()
+
+    async def on_raw_reaction_add(self, payload:RawReactionActionEvent):
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+        if guild.me.id == payload.user_id:
+            return
+
+        if str(payload.emoji) in (str(Emoji.get_emoji("APPROVE")), str(Emoji.get_emoji("DENY"))):
+            message = await self.bot.get_channel(payload.channel_id).get_message(payload.message_id)
+            user = guild.get_user(payload.user_id)
+            info = await self.bot.redis_link.hgetall(payload.message_id)
+            if "bug" not in info:
+                return
+            if not Checks.is_hunter(user):
+                await message.remove_reaction(payload.emoji, user)
+                return
+            if str(payload.emoji) == str(Emoji.get_emoji("APPROVE")):
+                await ReportUtils.real_add_attachment(Bug.get_by_id(info["bug"]), self.bot, user, info["link"], self.bot.get_user(info["bug"]),)
+            await message.delete()
 
 
 def setup(bot):

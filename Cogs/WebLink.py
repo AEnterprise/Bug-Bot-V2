@@ -49,7 +49,7 @@ class WebLink:
             await self.redis_link.subscribe(self.receiver.channel("web-bot-messages"))
             self.bot.loop.create_task(self._receiver())
             BugBotLogging.info("Web uplink established, disabling submit command")
-            # self.bot.remove_command("submit")
+            self.bot.remove_command("submit")
         except OSError:
             await BugBotLogging.bot_log("Failed to connect to the web api, backup submit command enabled!")
 
