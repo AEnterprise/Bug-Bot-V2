@@ -7,12 +7,13 @@ from argparse import ArgumentParser
 from datetime import datetime
 
 import aiohttp
+import aioredis
 from discord import Activity, Embed, Colour
 from discord.abc import PrivateChannel
 from discord.ext import commands
 
 import Utils
-from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisListener
+from Utils import BugBotLogging, Configuration, Emoji, Pages, Utils, Trello, DataUtils, RedisMessager, Checks
 
 bugbot = commands.Bot(command_prefix="!", case_insensitive=True)
 bugbot.STARTUP_COMPLETE = False
@@ -47,12 +48,6 @@ async def on_ready():
         DataUtils.init()
         await BugBotLogging.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
-        try:
-            bugbot.redis = RedisListener.Listener(bugbot.loop)
-            await bugbot.redis.initialize()
-        except OSError:
-            # no redis present, set connection to none
-            bugbot.redis = None
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
             try:
@@ -79,28 +74,32 @@ async def keepDBalive():
 async def on_command_error(ctx: commands.Context, error):
     # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
     if isinstance(error, commands.NoPrivateMessage):
-        await ctx.send("This command cannot be used in private messages.")
+        await ctx.send("This command cannot be used in private messages.", delete_after=10)
     elif isinstance(error, commands.BotMissingPermissions):
-        await ctx.send(error)
+        await ctx.send(error, delete_after=10)
+    elif isinstance(error, Checks.DMOnly):
+        await ctx.send("This command can only be used in DMs", delete_after=10)
     elif isinstance(error, commands.CheckFailure):
-        # TODO: do we want this or not?
-        await ctx.send(":lock: You do not have the required permissions to run this command")
+        await ctx.send(":lock: You do not have the required permissions to run this command", delete_after=10)
     elif isinstance(error, commands.CommandOnCooldown):
         # not sure if we're even gona have cooldowns, just here just in case
         await ctx.send(error)
     elif isinstance(error, commands.MissingRequiredArgument):
         param = list(ctx.command.params.values())[min(len(ctx.args) + len(ctx.kwargs), len(ctx.command.params))]
-        await ctx.send(f"{Emoji.get_chat_emoji('NO')} You are missing a required command argument: `{param.name}`\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`")
+        await ctx.send(f"{Emoji.get_chat_emoji('NO')} You are missing a required command argument: `{param.name}`\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`", delete_after=10)
     elif isinstance(error, commands.BadArgument):
         param = list(ctx.command.params.values())[min(len(ctx.args) + len(ctx.kwargs), len(ctx.command.params))]
-        await ctx.send(f"{Emoji.get_chat_emoji('NO')} Failed to parse the ``{param.name}`` param: ``{error}``\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`")
+        await ctx.send(f"{Emoji.get_chat_emoji('NO')} Failed to parse the ``{param.name}`` param: ``{error}``\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`", delete_after=10)
     elif isinstance(error, commands.CommandNotFound):
         return
 
     else:
         await handle_exception("Command execution failed", error.original, ctx=ctx)
         # notify caller
-        await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:")
+        await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:", delete_after=10)
+
+    await asyncio.sleep(10)
+    await ctx.message.delete()
 
 
 def extract_info(o):
@@ -222,6 +221,16 @@ async def handle_exception(exception_type, exception, event=None, message=None, 
         BugBotLogging.error(traceback.format_exc())
 
 
+async def connect_redis():
+        try:
+            redis_info = Configuration.get_master_var("REDIS", dict(host="localhost", port=6379))
+            bugbot.redis_link = await aioredis.create_redis_pool(
+                (redis_info["host"], redis_info["port"]),
+                encoding="utf-8", db=3)  # size 2: one send, one receive
+            BugBotLogging.info("Redis link esatablished")
+        except OSError:
+            await BugBotLogging.bot_log("Failed to connect to the redis!")
+
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--token", help="Specify your Discord token")
@@ -238,5 +247,7 @@ if __name__ == '__main__':
     else:
         token = input("Please enter your Discord token: ")
     BugBotLogging.info("BugBot taking off to collect the bugs!")
+    bugbot.lockdown = False
+    bugbot.loop.create_task(connect_redis())
     bugbot.run(token)
     BugBotLogging.info("Time for a nap, bugs will still be here later")

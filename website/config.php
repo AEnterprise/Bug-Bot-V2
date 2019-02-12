@@ -5,7 +5,8 @@ return (object) array(
     'redirect_uri' => 'https://something.com/callback',
     'client_id' => 'Bot client id',
     'client_secret' => 'Bot token',
-    'webserver_url' => 'http://serverip:8080/BugBot/reports'
+    'webserver_url' => 'http://serverip:8080/BugBot/reports',
+    'bugedit_url' => 'http://serverip:8080/bugbot/bugs/'
 );
 
 ?>

@@ -5,14 +5,18 @@ from functools import reduce
 from datetime import datetime, timedelta
 
 import discord
+from discord import RawReactionActionEvent
 from discord.ext import commands
 
 import BugBot
-from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji, RedisListener, ReportUtils, ExpUtils
+from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpUtils
+
+from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
+from Utils.Converters import BugReport, Link
 from Utils.DataUtils import Storeinfo, Bug, BugInfo
-from Utils.Enums import Platforms, ReportSource, ReportError, BugState, BugInfoType, TransactionEvent, BugBlockType
-from Utils.ReportUtils import BugReportException
-from Utils.Trello import TrelloException
+from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
+from Utils.ReportUtils import BugReportException, QueuedAttachment
+from Utils.Trello import TrelloException, TrelloUtils
 
 
 def platform_convert(platform):
@@ -28,37 +32,16 @@ def platform_convert(platform):
         return [Platforms.android, '-a']
 
 
-class BugReport(commands.Converter):
-    async def convert(self, ctx, argument):
-        if argument.isnumeric():
-            bug = Bug.get_or_none(id=argument)
-        else:
-            search = re.search(r'https?://trello\.com/c/(\w+)', argument)
-            if search:
-                shortlink = search.group(1)
-            else:
-                shortlink = argument
-            bug = Bug.get_or_none(trello_id=shortlink)
-        if bug is None:
-            raise commands.BadArgument(f'Report "{argument}" not found')
-        return bug
+
 
 
 class BugReporting:
     def __init__(self, bot):
         self.bot = bot
-        bot.loop.create_task(self.redis_init())
         bot.lockdown = False
         bot.lockdown_message = ""
 
-    async def redis_init(self):
-        if self.bot.redis:
-            BugBotLogging.info("Redis connection found, connecting and disabling dev submit command")
-            self.bot.remove_command("submit")
-            await self.bot.redis.subscribe('web_to_bot', self.receive_report, BugBot.handle_exception)
-            await self.bot.redis.subscribe('trello', self.process_trello_event, BugBot.handle_exception)
-        else:
-            BugBotLogging.warn("No redis connection found, leaving dev submit command in place for testing")
+
 
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:
@@ -203,7 +186,7 @@ class BugReporting:
     async def submit(self, ctx: commands.Context, platform: str, title, steps, expected, actual, client, system):
         member = Configuration.get_tester(ctx.author.id)
         try:
-            sections = dict(title=title, steps=steps, expected=expected, actual=actual, client=client, system=system)
+            sections = dict(title=title, steps=steps, expected=expected, actual=actual, client_info=client, device_info=system)
             steps = sections['steps'].split(' - ')
             del steps[0]
             sections['steps'] = '\n'.join([f'{idx + 1}. {step}' for idx, step in enumerate(steps)])
@@ -412,11 +395,10 @@ class BugReporting:
         # Reply to the user
         await ctx.send(reply, delete_after=3.0)
 
-        # Delete their invoke message
-        await asyncio.sleep(3)
-        await ctx.message.delete()
-
         if err is not None:
+            # Delete their invoke message
+            await asyncio.sleep(3)
+            await ctx.message.delete()
             return
 
         # Get users who have a stance on the bug
@@ -467,6 +449,8 @@ class BugReporting:
                 # Update queue message with the new embed
                 queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
                 await queue_msg.edit(embed=em)
+            await asyncio.sleep(3)
+            await ctx.message.delete()
         else:
             # Rebuild the embed
             em = ReportUtils.bug_to_embed(bug, self.bot)
@@ -474,6 +458,8 @@ class BugReporting:
             # Update queue message with the new embed
             queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
             await queue_msg.edit(embed=em)
+            await asyncio.sleep(3)
+            await ctx.message.delete()
 
     @commands.command()
     @commands.guild_only()
@@ -651,48 +637,6 @@ class BugReporting:
     async def cannotrepro(self, ctx, bug: BugReport, *, content: str):
         await self.process_trello_repro(ctx, bug, content, 'cannotrepro')
 
-    async def receive_report(self, report):
-        # validation has already been done by the webserver so we don't need to bother doing that again here
-
-        # no reporting during lockdown
-        if self.bot.lockdown:
-            reply = dict(submitted=False, lockdown=True, message=self.bot.lockdown_message)
-            await self.bot.redis.send('bot_to_web', reply)
-        else:
-            user = self.bot.get_user(int(report['user_id']))
-            try:
-                # try to send report
-                id = await ReportUtils.add_report(user, report, ReportSource.form)
-                reply = dict(UUID=report["UUID"], submitted=True, lockdown=False,
-                             message=f"Your report ID is {id}")
-                await self.bot.redis.send('bot_to_web', reply)
-            except Exception as ex:
-                # something went wrong, notify the other side
-                reply = dict(UUID=report["UUID"], submitted=False, lockdown=False, message="Something went very wrong. Mods have been notified, please try again later")
-                await self.bot.redis.send('bot_to_web', reply)
-                raise ex
-
-    async def process_trello_event(self, data):
-        card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']
-        if data['type'] in card_events:
-            bug = Bug.get_or_none(Bug.trello_id == data['data']['card']['shortLink'])
-            if bug is not None:
-                bug.last_activity = datetime.utcnow()
-                if 'listAfter' in data['data']:
-                    bug.trello_list = data['data']['listAfter']['id']
-                elif 'list' in data['data']:
-                    bug.trello_list = data['data']['list']['id']
-                bug.save()
-                if data['type'] == 'commentCard':
-                    pass
-                    # If a dev/engineer commented on the card (backlog feature)
-                    # if data['idMemberCreator'] in Configuration.get_var('bugbot', 'dev_trello_ids'):
-                    #    pass
-                if not bug.xp_awarded:
-                    if data['type'] == 'updateCard':
-                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, bug.trello_list, archived=data['data']['card'].get('closed', False))
-                    elif data['type'] == 'addLabelToCard':
-                        await ExpUtils.award_bug_xp(self.bot, bug.trello_id, label_ids=[data['data']['label']['id']], archived=data['data']['card'].get('closed', False))
 
     @commands.command(name='bug')
     @Checks.is_modinator()
@@ -713,6 +657,38 @@ class BugReporting:
             return await ctx.send(f"{Emoji.get_emoji('WARNING')} {ctx.author.mention} Your DM settings does not allow me to DM you.", delete_after=3.0)
         await ctx.message.delete()
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
+
+    @commands.command()
+    async def attach(self, ctx, bug:BugReport, link:Link):
+        await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
+
+    @Checks.is_bug_hunter()
+    @commands.command()
+    async def detach(self, ctx, bug: BugReport, link: Link):
+        message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
+        await ctx.send(message, delete_after=5)
+        await asyncio.sleep(5)
+        await message.delete()
+
+    async def on_raw_reaction_add(self, payload:RawReactionActionEvent):
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+        if guild.me.id == payload.user_id:
+            return
+
+        if str(payload.emoji) in (str(Emoji.get_emoji("APPROVE")), str(Emoji.get_emoji("DENY"))):
+            message = await self.bot.get_channel(payload.channel_id).get_message(payload.message_id)
+            user = guild.get_user(payload.user_id)
+            info = await self.bot.redis_link.hgetall(payload.message_id)
+            if "bug" not in info:
+                return
+            if not Checks.is_hunter(user):
+                await message.remove_reaction(payload.emoji, user)
+                return
+            if str(payload.emoji) == str(Emoji.get_emoji("APPROVE")):
+                await ReportUtils.real_add_attachment(Bug.get_by_id(info["bug"]), self.bot, user, info["link"], self.bot.get_user(info["bug"]),)
+            await message.delete()
 
 
 def setup(bot):

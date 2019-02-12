@@ -9,3 +9,4 @@ logs/*
 config/master.yaml
 config/bugbot.yaml
 config/strings.yaml
+data.sqlite

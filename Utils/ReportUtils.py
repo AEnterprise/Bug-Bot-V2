@@ -1,12 +1,15 @@
 # Validators: return error message on fail, empty string on pass
 # probably a better way to do this, but this works pretty good for now
+import asyncio
 import re
+from collections import namedtuple
 
-from discord import Embed
+from discord import Embed, Forbidden, NotFound
 
-from Utils import Configuration, Utils, Emoji
-from Utils.DataUtils import Bug
-from Utils.Enums import Platforms, ReportError, BugInfoType, BugBlockType
+from Utils import Configuration, Utils, Emoji, Checks, BugBotLogging
+from Utils.DataUtils import Bug, BugInfo
+from Utils.Enums import Platforms, ReportError, BugInfoType, BugBlockType, BugState
+from Utils.Trello import TrelloUtils
 
 
 class BugReportException(Exception):
@@ -16,23 +19,29 @@ class BugReportException(Exception):
         self.msg = msg
 
 
-def validate_report(report):
-    for name in ["title", "steps", "expected", "actual", "client", "system", "platform"]:
-        if name not in report or report[name].strip() == "":
-            raise BugReportException(ReportError.missing_fields, name)
+def validate_report(report, require_all=True):
+    fields = ["title", "steps", "expected", "actual", "client_info", "device_info", "platform"]
+    if require_all:
+        for name in fields:
+            if name not in report or report[name].strip() == "":
+                raise BugReportException(ReportError.missing_fields, name)
+    for name in report:
+        if name not in fields and name != "user_id":
+            raise BugReportException(ReportError.bad_field, name)
     # Check the platform is valid (or can be aliased)
     platforms = Configuration.get_var('bugbot', 'BUG_PLATFORMS')
-    platform_data = platforms.get(report["platform"].upper(), None)
-    if platform_data is None:
-        for p, pd in platforms.items():  # TODO: Squash this
-            if report["platform"].lower() in pd['ALIASES']:
-                report["platform"] = p
-                platform_data = pd
-                break
-    if platform_data is None:
-        raise BugReportException(ReportError.unknown_platform, report["platform"])
+    if "platform" in report:
+        platform_data = platforms.get(report["platform"].upper(), None)
+        if platform_data is None:
+            for p, pd in platforms.items():  # TODO: Squash this
+                if report["platform"].lower() in pd['ALIASES']:
+                    report["platform"] = p
+                    platform_data = pd
+                    break
+        if platform_data is None:
+            raise BugReportException(ReportError.unknown_platform, report["platform"])
 
-    if len(report["steps"]) < 2:
+    if "steps" in report and len(report["steps"]) < 2:
         raise BugReportException(ReportError.missing_steps)
 
     # Check for links/invites in the report (exclude trello.com)
@@ -55,8 +64,8 @@ async def add_report(user, sections, source):
         steps=sections['steps'],
         expected=sections['expected'],
         actual=sections['actual'],
-        client_info=sections['client'],
-        device_info=sections['system'],
+        client_info=sections['client_info'],
+        device_info=sections['device_info'],
         platform=Platforms[sections["platform"].lower()],
         source=source
     )
@@ -97,8 +106,8 @@ def build_report_embed(data):
     em.add_field(name='Steps to Reproduce', value=data['steps'], inline=False)
     em.add_field(name='Expected Result', value=data['expected'], inline=False)
     em.add_field(name='Actual Result', value=data['actual'], inline=False)
-    em.add_field(name='Client Info', value=data['client'], inline=True)
-    em.add_field(name='Device/System Info', value=data['system'], inline=True)
+    em.add_field(name='Client Info', value=data['client_info'], inline=True)
+    em.add_field(name='Device/System Info', value=data['device_info'], inline=True)
     em.add_field(name='Report ID', value=f'**{data["id"]}**', inline=False)
 
     if 'trello_id' in data:
@@ -147,8 +156,8 @@ def bug_to_embed(bug, bot):
         'steps': bug.steps,
         'expected': bug.expected,
         'actual': bug.actual,
-        'client': bug.client_info,
-        'system': bug.device_info,
+        'client_info': bug.client_info,
+        'device_info': bug.device_info,
         'repros': [],
         'attachments': []
     }
@@ -190,3 +199,62 @@ def bug_to_embed(bug, bot):
     if bug.trello_id is not None:
         data['trello_id'] = bug.trello_id
     return build_report_embed(data)
+
+
+async def update_bug(bug, bot):
+    # if not approved we need the queue
+    channel = None
+    if bug.state == BugState.queued:
+        channel = 'QUEUE'
+    elif bug.state == BugState.approved:
+        channel = bug.platform.name.upper()
+    channel = Configuration.get_bugchannel(channel)
+    try:
+        message = await channel.get_message(bug.msg_id)
+        await message.edit(embed=bug_to_embed(bug, bot))
+    except (Forbidden, NotFound):
+        BugBotLogging.info(f"Failed to update {bug.id} on discord")
+
+
+async def add_attachment(bug, bot, user, link, message=None):
+    if Checks.is_hunter(user):
+        await real_add_attachment(bug, bot, user, link, user, message)
+    else:
+        channel = Configuration.get_channel("ATTACHMENTS")
+        embed = Embed(description=f"{Utils.escape_markdown(str(user))} wants to attach {link} to #{bug.id}")
+        message = await channel.send(embed=embed)
+        await message.add_reaction(Emoji.get_emoji("APPROVE"))
+        await message.add_reaction(Emoji.get_emoji("DENY"))
+        await bot.redis_connection.hmset_dict(
+            message.id,
+            bug=bug.id,
+            user=user.id,
+            link=link
+        )
+
+
+async def real_add_attachment(bug, bot, user, link, approved_by, message):
+    # skip the queue
+    trello_id = None
+    if bug.trello_id is not None:
+        trello_id = await bot.trello.add_attachment(bug.trello_id, str(user), link)
+    BugInfo.create(user=user.id, content=link, bug=bug, type=BugInfoType.attachment, trello_id=trello_id)
+    await update_bug(bug, bot)
+    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id} (approved by {Utils.escape_markdown(str(approved_by))}")
+    if message is not None:
+        await message.channel.send(f"{user.mention} Your attachment was added to #{bug.id}", delete_after=5)
+        await asyncio.sleep(5)
+        await message.delete()
+
+
+async def remove_attachment(bug, bot, user, link):
+    info = BugInfo.get_or_none(bug=bug.id, content=link)
+    if info is None:
+        return "I could not find that link attached to that bug"
+    else:
+        if info.trello_id is not None:
+            await  bot.trello.remove_attachment(bug.trello_id, info.trello_id)
+        info.delete_instance()
+        await update_bug(bug, bot)
+        await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} detached <{link}> from #{bug.id}")
+        return "Attachment removed"

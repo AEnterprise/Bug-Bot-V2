@@ -62,3 +62,5 @@ class ReportError(Enum):
     missing_steps = 3
     blacklisted_words = 4
     length_exceeded = 5
+    bad_field = 6
+

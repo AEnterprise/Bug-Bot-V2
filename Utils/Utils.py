@@ -19,8 +19,8 @@ def save_to_disk(filename, dict):
 
 def escape_markdown(text):
     text = str(text)
-    for c in ("\\", "`", "*", "_", "~", "<"):
-        text = text.replace(c, f"\{c}\u200b")
+    for c in ["\\", "`", "*", "_", "~", "|", "{"]:
+        text = text.replace(c, f"\\{c}")
     return text.replace("@", "@\u200b")
 
 
