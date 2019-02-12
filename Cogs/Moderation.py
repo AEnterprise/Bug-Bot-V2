@@ -22,6 +22,7 @@ class Moderation:
                 if message.content == self.lockdown_message:
                     await message.edit(content=new_message)
         await ctx.send(f"{Emoji.get_chat_emoji('YES')} Successfully edited your lockdown message.")
+        await BugBotLogging.bot_log(f"{Emoji.get_chat_emoji('TODO')} {ctx.author} (`{ctx.author.id}`) edited the lockdown messages `{self.lockdown_message}` -> `{new_message}`.")
         self.lockdown_message = new_message
 
     async def lockdown_trigger_all(self, ctx, reason):
@@ -40,6 +41,7 @@ class Moderation:
                 overwrites_everyone.send_messages = False
                 await bugreportchannel.set_permissions(r, overwrite=overwrites_everyone, reason=f"Lockdown initiated by {ctx.author} for reason: {reason}")
         await ctx.send(f"{Emoji.get_chat_emoji('YES')} Successfully put all specified channels on lockdown.")
+        await BugBotLogging.bot_log(f"{Emoji.get_chat_emoji('LOCK')} {ctx.author} (`{ctx.author.id}`) put `{self.locked_channels}` on lockdown.")
         self.lockdown_message = reason
         self.lockdown_running = True
 
@@ -61,6 +63,7 @@ class Moderation:
                     overwrites_everyone.send_messages = False
                     await channels.set_permissions(r, overwrite=overwrites_everyone, reason=f"Lockdown initiated by {ctx.author} for reason: {reason}")
         await ctx.send(f"{Emoji.get_chat_emoji('YES')} Successfully put all specified channels on lockdown.")
+        await BugBotLogging.bot_log(f"{Emoji.get_chat_emoji('LOCK')} {ctx.author} (`{ctx.author.id}`) put `{self.locked_channels}` on lockdown.")
         self.lockdown_message = reason
         self.lockdown_running = True
 
@@ -83,6 +86,7 @@ class Moderation:
                 if message.content == self.lockdown_message:
                     await message.delete()
         await ctx.send(f"{Emoji.get_chat_emoji('YES')} Successfully unlocked all channels from lockdown.")
+        await BugBotLogging.bot_log(f"{Emoji.get_chat_emoji('UNLOCK')} {ctx.author} (`{ctx.author.id}`) unlocked the channels from lockdown.")
         self.lockdown_running = False
 
     @commands.command()
