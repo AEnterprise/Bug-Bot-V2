@@ -15,7 +15,7 @@ from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
 from Utils.Converters import BugReport, Link
 from Utils.DataUtils import Storeinfo, Bug, BugInfo
 from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
-from Utils.ReportUtils import BugReportException, QueuedAttachment
+from Utils.ReportUtils import BugReportException
 from Utils.Trello import TrelloException, TrelloUtils
 
 
