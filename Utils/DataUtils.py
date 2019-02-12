@@ -69,12 +69,13 @@ class BugInfo(Model):
 class BugHunter(Model):
     id = BigIntegerField(primary_key=True)  # re-use userid as hunter key
     xp = SmallIntegerField(default=0)
+    lifetime_xp = IntegerField(default=0)
     initiate_at = DateTimeField(default=datetime.utcnow)
     hunter_at = DateTimeField(null=True)  # optional, for people still at initiate phase
 
     class Meta:
         database = connection
-        constraints = [Check('xp >= 0')]
+        constraints = [Check('xp >= 0'), Check('lifetime_xp >= 0')]
 
 
 class Tag(Model):

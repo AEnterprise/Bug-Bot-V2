@@ -211,7 +211,6 @@ class Experience:
         await ctx.send(f'Last {limit} transactions for {user}:\n```{td}```')
 
     async def give_repro_xp(self, user_id, event):
-        # Called by the queue cog (only on new repros) and will handle giving XP if eligible
         bucket_groups = {
             'QUEUE_REPRO': [TransactionEvent.approve, TransactionEvent.deny],
             'CANREPRO': [TransactionEvent.can_repro, TransactionEvent.cannot_repro]
@@ -224,10 +223,21 @@ class Experience:
         if events is None:
             return False
         tc = ExpUtils.get_transactions(user_id, events, last='day').count()
+        if group == 'QUEUE_REPRO':
+            rc = ExpUtils.get_transactions(user_id, [TransactionEvent.revoke], last='day').count()
+            if rc > tc:
+                rc = tc
+            tc -= rc
+        bonus = 0
         limits = Configuration.get_var('bugbot', 'DAILY_XP_LIMITS')
-        if tc < limits.get(group):
+        member = Configuration.get_tester(user_id)
+        for role_id, b in Configuration.get_var('bugbot', 'COOLDOWN_BONUSES').items():
+            role = discord.utils.get(member.roles, id=role_id)
+            if role is not None:
+                bonus += b
+        if tc < (limits.get(group) + bonus):
             amount = Configuration.get_var('bugbot', 'XP').get(group)
-            ExpUtils.add_xp(user_id, amount, self.bot.user.id, event)
+            await ExpUtils.add_xp(user_id, amount, self.bot.user.id, event)
 
     @commands.command()
     @Checks.is_bug_hunter()
@@ -278,7 +288,7 @@ class Experience:
         if amount < 1:
             await ctx.send('XP amount cannot be less than 1')
         else:
-            balance = ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
+            balance = await ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
             await BugBotLogging.bot_log(f':moneybag: {ctx.author} gave {amount} XP to {user} (`{user.id}`). Their new balance is {balance} XP')
             await ctx.send(f'Gave {amount} XP to {user}. New balance is {balance} XP', delete_after=5.0)
         try:
@@ -292,7 +302,7 @@ class Experience:
         if amount < 1:
             await ctx.send('XP amount cannot be less than 1')
         else:
-            balance = ExpUtils.get_xp(user.id)
+            balance = ExpUtils.get_xp(user.id)[0]
             # Remove all XP if we're taking more than they have
             if amount > balance:
                 amount = balance
@@ -308,7 +318,7 @@ class Experience:
     @Checks.is_modinator()
     async def reward(self, ctx: commands.Context, user: discord.User):
         amount = Configuration.get_var('bugbot', 'XP').get('REWARD')
-        balance = ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
+        balance = await ExpUtils.add_xp(user.id, amount, ctx.author.id, TransactionEvent.reward)
         if balance is not None:
             await BugBotLogging.bot_log(f':moneybag: {ctx.author} rewarded {user} (`{user.id}`) with {amount} XP. Their new balance is {balance} XP')
             await ctx.send(f':ok_hand: {user} received some XP for helping out!', delete_after=5.0)
@@ -323,7 +333,7 @@ class Experience:
     @Checks.is_bug_hunter()
     @Checks.dm_only()
     async def xp(self, ctx: commands.Context):
-        balance = ExpUtils.get_xp(ctx.author.id)
+        balance = ExpUtils.get_xp(ctx.author.id)[0]
         em = discord.Embed()
         em.title = 'XP'
         em.description = f'You have **{balance}** XP!'
@@ -342,23 +352,50 @@ class Experience:
         for action in actions:
             groups[map[action.event]]['ts'].append(action.timestamp)
         action_txt = ''
+        bonus = 0
+        bonuses = []
+        member = Configuration.get_tester(ctx.author.id)
+        for role_id, b in Configuration.get_var('bugbot', 'COOLDOWN_BONUSES').items():
+            role = discord.utils.get(member.roles, id=role_id)
+            if role is not None:
+                bonus += b
+                bonuses.append(f'{role.name} Bonus')
         for group, data in groups.items():
-            limit = Configuration.get_var('bugbot', 'DAILY_XP_LIMITS').get(data['cfg'])
+            limit = Configuration.get_var('bugbot', 'DAILY_XP_LIMITS').get(data['cfg']) + bonus
+            used = len(data['ts'])
+            if data['cfg'] == 'QUEUE_REPRO':
+                rc = ExpUtils.get_transactions(ctx.author.id, [TransactionEvent.revoke], last='day').count()
+                if rc > used:
+                    rc = used
+                used -= rc
             cd = ''
-            if len(data['ts']) >= limit:
+            if used >= limit:
                 rem_secs = ((min(data['ts']) + timedelta(days=1)) - datetime.utcnow()).total_seconds()
                 hours, rem = divmod(rem_secs, 3600)
                 mins, secs = divmod(rem, 60)
                 cd = f' - Cools down in {int(hours)}h {int(mins)}m {int(secs)}s'
-            action_txt += f'**{group}**\n{len(data["ts"])}/{limit}{cd}\n'
-        em.add_field(name='Queue XP Actions (past 24h)', value=action_txt)
+            action_txt += f'**{group}**\n{used}/{limit}{cd}\n'
+        em.add_field(name='Queue XP Actions (past 24h)', value=action_txt, inline=False)
+        if len(bonuses) > 0:
+            em.add_field(name='Bonuses', value=', '.join(bonuses), inline=False)
         await ctx.send(embed=em)
 
     @commands.command()
     @Checks.is_modinator()
     async def getxp(self, ctx: commands.Context, user: discord.User):
-        balance = ExpUtils.get_xp(user.id)
+        balance = ExpUtils.get_xp(user.id)[0]
         await ctx.send(f'{user} has {balance} XP', delete_after=10.0)
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+    @commands.command(aliases=['badge'])
+    @Checks.is_modinator()
+    async def get_badge_progress(self, ctx, user: discord.User):
+        required = Configuration.get_var('bugbot', 'BADGE_REQUIREMENT')
+        lifetime_xp = ExpUtils.get_xp(user.id)[1]
+        await ctx.send(f'{user} has {lifetime_xp}/{required} XP towards the badge', delete_after=10.0)
         try:
             await ctx.message.delete()
         except (discord.Forbidden, discord.HTTPException):
