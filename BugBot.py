@@ -65,7 +65,7 @@ async def on_ready():
         await restart_cleanup()
         await BugBotLogging.bot_log("Here we go!")
         bugbot.STARTUP_COMPLETE = True
-    # we got the ready event, usually means we resumed, make sure the status is still there
+    # we got the ready event, usually means we identified, make sure the status is still there
     await bugbot.change_presence(activity=Activity(type=3, name='over the bug boards'))
 
 
@@ -78,7 +78,6 @@ async def keepDBalive():
 @bugbot.event
 async def on_command_error(ctx: commands.Context, error):
     # lots of things can go wrong with commands, let's make sure we handle them nicely where approprate
-    # TODO: cleanup if any of these is in a reporting channel?
     if isinstance(error, commands.NoPrivateMessage):
         await ctx.send("This command cannot be used in private messages.")
     elif isinstance(error, commands.BotMissingPermissions):
@@ -90,7 +89,6 @@ async def on_command_error(ctx: commands.Context, error):
         # not sure if we're even gona have cooldowns, just here just in case
         await ctx.send(error)
     elif isinstance(error, commands.MissingRequiredArgument):
-        #
         param = list(ctx.command.params.values())[min(len(ctx.args) + len(ctx.kwargs), len(ctx.command.params))]
         await ctx.send(f"{Emoji.get_chat_emoji('NO')} You are missing a required command argument: `{param.name}`\n{Emoji.get_chat_emoji('WRENCH')} Command usage: `{ctx.prefix.replace(ctx.me.mention,f'@{ctx.me.name}') + ctx.command.signature}`")
     elif isinstance(error, commands.BadArgument):
