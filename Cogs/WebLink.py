@@ -153,7 +153,6 @@ class WebLink:
         return dict(status=200, data=dict(updated=True))
 
     async def process_trello_event(self, data):
-        print("got the call")
         card_events = ['addAttachmentToCard', 'addLabelToCard', 'addMemberToCard', 'commentCard', 'deleteAttachmentFromCard', 'removeLabelFromCard', 'removeMemberFromCard', 'updateCard']
         if data['type'] in card_events:
             bug = Bug.get_or_none(Bug.trello_id == data['data']['card']['shortLink'])

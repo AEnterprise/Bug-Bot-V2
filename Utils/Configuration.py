@@ -1,4 +1,6 @@
-import yaml
+from ruamel.yaml import YAML, YAMLError
+
+yaml = YAML()
 
 from Utils import BugBotLogging
 
@@ -47,10 +49,10 @@ def save_master():
 def load_config(filename):
     try:
         with open(f'config/{filename}', 'r') as yamlfile:
-            return yaml.safe_load(yamlfile)
+            return yaml.load(yamlfile)
     except FileNotFoundError:
         BugBotLogging.error(f'Unable to load config/{filename}')
-    except yaml.YAMLError:
+    except YAMLError:
         BugBotLogging.error(f'Unable to parse config/{filename}')
         raise
 
