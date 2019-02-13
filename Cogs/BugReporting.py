@@ -644,7 +644,8 @@ class BugReporting:
         try:
             bug = Bug.get_by_id(bugID)
         except:
-            await ctx.message.delete()
+            if ctx.guild is not None:
+                await ctx.message.delete()
             await BugBotLogging.bot_log(f"{Emoji.get_emoji('WARNING')} {ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but the bug ID specified does not even exist.")
             return await ctx.send(f"{ctx.author.mention} I was unable to find any bug with the ID `{bugID}`.", delete_after=3.0)
         platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
