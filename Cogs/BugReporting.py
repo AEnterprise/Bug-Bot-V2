@@ -659,11 +659,13 @@ class BugReporting:
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
     @commands.command()
+    @commands.guild_only()
     async def attach(self, ctx, bug:BugReport, link:Link):
         await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
 
     @Checks.is_bug_hunter()
     @commands.command()
+    @commands.guild_only()
     async def detach(self, ctx, bug: BugReport, link: Link):
         message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
         await ctx.send(message, delete_after=5)
