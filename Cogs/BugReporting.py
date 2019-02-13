@@ -398,7 +398,10 @@ class BugReporting:
         if err is not None:
             # Delete their invoke message
             await asyncio.sleep(3)
-            await ctx.message.delete()
+            try:
+                await ctx.message.delete()
+            except discord.NotFound:
+                pass
             return
 
         # Get users who have a stance on the bug
