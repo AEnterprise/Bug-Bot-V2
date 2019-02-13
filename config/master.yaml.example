@@ -34,6 +34,11 @@ EMOJI:
   ANDROID: 332598085782077451
   APPROVE: 1234
   DENY: 1234
+  DESKTOP: ":desktop:"
+  LINUX: ":penguin:"
+  IOS: ":iphone:"
+  STORE: ":moneybag:"
+  MARKETING: ":spider_web:"
 TRELLO_KEY: xyz123
 TRELLO_TOKEN: xyz123
 GUILD_ID: 411673927698350100

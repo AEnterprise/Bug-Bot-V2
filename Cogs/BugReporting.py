@@ -474,13 +474,13 @@ class BugReporting:
     @commands.command()
     @commands.guild_only()
     @Checks.is_employee()
-    async def dapprove(self, ctx, report_id: int, * content: str):
+    async def dapprove(self, ctx, report_id: int, *, content: str):
         await self.process_stance(ctx, report_id, content, 'approve', override=True)
 
     @commands.command()
     @commands.guild_only()
     @Checks.is_employee()
-    async def ddeny(self, ctx, report_id: int, * content: str):
+    async def ddeny(self, ctx, report_id: int, *, content: str):
         await self.process_stance(ctx, report_id, content, 'deny', override=True)
 
     @commands.command()
@@ -660,15 +660,18 @@ class BugReporting:
 
     @commands.command()
     async def attach(self, ctx, bug:BugReport, link:Link):
-        await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
+        await self.show_response(ctx, ReportUtils.add_attachment(bug, self.bot, ctx.author, link))
 
     @Checks.is_bug_hunter()
     @commands.command()
     async def detach(self, ctx, bug: BugReport, link: Link):
-        message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
+        await self.show_response(ctx, ReportUtils.remove_attachment(bug, self.bot, ctx.author, link))
+
+    async def show_response(self, ctx, supplier):
+        message = await supplier
         await ctx.send(message, delete_after=5)
         await asyncio.sleep(5)
-        await message.delete()
+        await ctx.message.delete()
 
     async def on_raw_reaction_add(self, payload:RawReactionActionEvent):
         guild = self.bot.get_guild(payload.guild_id)

@@ -79,9 +79,7 @@ async def add_report(user, sections, source):
             report['submitter']['emoji'] = Emoji.get_chat_emoji('MEOWBUGHUNTER')
     platforms = Configuration.get_var('bugbot', 'BUG_PLATFORMS')
     platform_data = platforms.get(sections["platform"].upper(), None)
-    if not platform_data['EMOJI'].startswith(':'):
-        platform_data['EMOJI'] = Emoji.get_chat_emoji(platform_data['EMOJI'])
-    report['platform'] = {'name': platform_data['DISPLAY'], 'colour': platform_data['COLOUR'], 'emoji': platform_data['EMOJI']}
+    report['platform'] = {'name': platform_data['DISPLAY'], 'colour': platform_data['COLOUR'], 'emoji': Emoji.get_chat_emoji(sections["platform"].upper())}
     em = build_report_embed(report)
 
     # Post embed in queue and get message ID
@@ -122,6 +120,8 @@ def build_report_embed(data):
             emoji = Emoji.get_chat_emoji('DENY')
         elif x['type'] == 'note':
             emoji = ':pencil:'
+        else:
+            emoji = "ERROR"  # shouldn't happen but makes it easy to differentiate between
         if x['type'] in repro_counts:
             repro_counts[x['type']] += 1
         if repro_counts[x['type']] > 5:
@@ -144,7 +144,7 @@ def bug_to_embed(bug, bot):
         'platform': {
             'name': platform['DISPLAY'],
             'colour': platform['COLOUR'],
-            'emoji': platform['EMOJI']
+            'emoji': Emoji.get_chat_emoji(bug.platform.name.upper())
         },
         'submitter': {
             'username': str(bot.get_user(bug.reporter)),
@@ -161,9 +161,6 @@ def bug_to_embed(bug, bot):
         'repros': [],
         'attachments': []
     }
-    # Get the platform emoji if it's custom
-    if not data['platform']['emoji'].startswith(':'):
-        data['platform']['emoji'] = Emoji.get_chat_emoji(data['platform']['emoji'])
     # Add user emoji if they're a hunter
     reporter = Configuration.get_tester(bug.reporter)
     if reporter is not None:
@@ -216,11 +213,11 @@ async def update_bug(bug, bot):
         BugBotLogging.info(f"Failed to update {bug.id} on discord")
 
 
-async def add_attachment(bug, bot, user, link, message=None):
+async def add_attachment(bug, bot, user, link):
     if Checks.is_hunter(user):
-        await real_add_attachment(bug, bot, user, link, user, message)
+        return await real_add_attachment(bug, bot, user, link, user)
     else:
-        channel = Configuration.get_channel("ATTACHMENTS")
+        channel = Configuration.get_bugchannel("ATTACHMENTS")
         embed = Embed(description=f"{Utils.escape_markdown(str(user))} wants to attach {link} to #{bug.id}")
         message = await channel.send(embed=embed)
         await message.add_reaction(Emoji.get_emoji("APPROVE"))
@@ -231,20 +228,18 @@ async def add_attachment(bug, bot, user, link, message=None):
             user=user.id,
             link=link
         )
+        return "Your attachment has been added to the approval queue for reviewing"
 
 
-async def real_add_attachment(bug, bot, user, link, approved_by, message):
+async def real_add_attachment(bug, bot, user, link, approved_by):
     # skip the queue
     trello_id = None
     if bug.trello_id is not None:
         trello_id = await bot.trello.add_attachment(bug.trello_id, str(user), link)
     BugInfo.create(user=user.id, content=link, bug=bug, type=BugInfoType.attachment, trello_id=trello_id)
     await update_bug(bug, bot)
-    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id} (approved by {Utils.escape_markdown(str(approved_by))}")
-    if message is not None:
-        await message.channel.send(f"{user.mention} Your attachment was added to #{bug.id}", delete_after=5)
-        await asyncio.sleep(5)
-        await message.delete()
+    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id} (approved by {Utils.escape_markdown(str(approved_by))})")
+    return f"{user.mention} Your attachment was added to #{bug.id}"
 
 
 async def remove_attachment(bug, bot, user, link):

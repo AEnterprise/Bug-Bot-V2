@@ -58,8 +58,7 @@ class Messager:
 
     async def get_reply(self, type, data):
         try:
-            data["type"] = type
-            return (await asyncio.wait_for(self._get_reply(data), 10))["reply"]
+            return (await asyncio.wait_for(self._get_reply(dict(type=type, content=data)), 10))["reply"]
         except TimeoutError:
             raise Redisception("No reply received from the bot!")
 
@@ -75,6 +74,4 @@ class Messager:
         return reply
 
     async def send(self, type, data):
-        print(f"redismessage sending as {type}")
-        data["type"] = type
-        await self.conn.publish_json(self.outbound, data)
+        await self.conn.publish_json(self.outbound, dict(type=type, content=data))

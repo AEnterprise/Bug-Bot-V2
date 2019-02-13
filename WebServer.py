@@ -1,6 +1,3 @@
-import asyncio
-import uuid
-
 from aiohttp import web
 
 from Utils import ReportUtils, RedisMessager
@@ -19,18 +16,14 @@ def is_trello_ip(ip):
 @routes.head('/bugbot/trello')
 @routes.post('/bugbot/trello')
 async def trello(request):
-    print("someone calling the trello hook")
     remote_ip = request.remote
     if remote_ip == '127.0.0.1':
         remote_ip = request.headers['X-Forwarded-For']  # For local testing with ngrok
     if not is_trello_ip(remote_ip):
-        print("and they where not trello")
         return web.Response(status=403)
     # TODO: Could also verify the signature
     if request.method == 'POST':
         data = await request.json()
-        print("sending")
-        print(data)
         await request.app.redis.send('process_trello_event', data['action'])
     return web.Response()
 
