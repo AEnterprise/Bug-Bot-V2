@@ -137,7 +137,16 @@ class Purchase(Model):
         database = connection
 
 
+class QueuedAttachment(Model):
+    message = BigIntegerField(primary_key=True)
+    bug = ForeignKeyField(Bug, backref="pending_attachments")
+    link = CharField(max_length=500, collation="utf8mb4_general_ci")
+    user = BigIntegerField()
+
+    class Meta:
+        database = connection
+
 def init():
     connection.connect()
-    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase])
+    connection.create_tables([Bug, BugInfo, BugHunter, Tag, Transaction, Storeinfo, StoreItem, Purchase, QueuedAttachment])
     connection.close()

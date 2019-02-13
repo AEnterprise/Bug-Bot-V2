@@ -1,5 +1,16 @@
 import json
+from collections import namedtuple, OrderedDict
+from datetime import datetime
+
+from discord import NotFound
+
 from Utils import BugBotLogging, Configuration
+BOT = None
+
+
+def initialize(bot):
+    global BOT
+    BOT = bot
 
 
 def fetch_from_disk(filename, alternative=None):
@@ -52,3 +63,76 @@ def trim_message(message, limit):
     if len(message) < limit - 3:
         return message
     return f"{message[:limit-3]}..."
+
+
+async def username(uid, fetch=True, clean=True):
+    user = await get_user(uid, fetch)
+    if user is None:
+        return "UNKNOWN USER"
+    if clean:
+        return escape_markdown(str(user))
+    else:
+        return str(user)
+
+known_invalid_users = []
+user_cache = OrderedDict()
+
+
+async def get_user(uid, fetch=True):
+    UserClass = namedtuple("UserClass", "name id discriminator bot avatar_url created_at is_avatar_animated mention")
+    user = BOT.get_user(uid)
+    if user is None:
+        if uid in known_invalid_users:
+            return None
+
+        if BOT.redis_link is not None:
+            userCacheInfo = await BOT.redis_link.hgetall(uid)
+
+            if len(userCacheInfo) == 8:
+                userFormed = UserClass(
+                    userCacheInfo["name"],
+                    userCacheInfo["id"],
+                    userCacheInfo["discriminator"],
+                    userCacheInfo["bot"] == "1",
+                    userCacheInfo["avatar_url"],
+                    datetime.fromtimestamp(float(userCacheInfo["created_at"])),
+                    bool(userCacheInfo["is_avatar_animated"]) == "1",
+                    userCacheInfo["mention"]
+                )
+
+                return userFormed
+            if fetch:
+                try:
+                    user = await BOT.get_user_info(uid)
+                    pipeline = BOT.redis_link.pipeline()
+                    pipeline.hmset_dict(uid,
+                                        name=user.name,
+                                        id=user.id,
+                                        discriminator=user.discriminator,
+                                        bot=int(user.bot),
+                                        avatar_url=user.avatar_url,
+                                        created_at=user.created_at.timestamp(),
+                                        is_avatar_animated=int(user.is_avatar_animated()),
+                                        mention=user.mention
+                                        )
+
+                    pipeline.expire(uid, 300)  # 5 minute cache life
+
+                    BOT.loop.create_task(pipeline.execute())
+
+                except NotFound:
+                    known_invalid_users.append(uid)
+                    return None
+        else:  # No Redis, using the dict method instead
+            if uid in user_cache:
+                return user_cache[uid]
+            if fetch:
+                try:
+                    user = await BOT.get_user_info(uid)
+                    if len(user_cache) >= 10:  # Limit the cache size to the most recent 10
+                        user_cache.popitem()
+                    user_cache[uid] = user
+                except NotFound:
+                    known_invalid_users.append(uid)
+                    return None
+    return user

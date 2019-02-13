@@ -1,15 +1,13 @@
 # Validators: return error message on fail, empty string on pass
 # probably a better way to do this, but this works pretty good for now
-import asyncio
 import re
-from collections import namedtuple
 
-from discord import Embed, Forbidden, NotFound, utils
+from discord import Embed, Forbidden, NotFound
 
-from Utils import Configuration, Utils, Emoji, Checks, BugBotLogging
-from Utils.DataUtils import Bug, BugInfo
+from Utils import Configuration, Utils, Emoji, Checks, BugBotLogging, DataUtils
+from Utils.DataUtils import Bug, BugInfo, QueuedAttachment
 from Utils.Enums import Platforms, ReportError, BugInfoType, BugBlockType, BugState
-from Utils.Trello import TrelloUtils
+
 
 
 class BugReportException(Exception):
@@ -136,7 +134,7 @@ def build_report_embed(data):
     return em
 
 
-def bug_to_embed(bug, bot):
+async def bug_to_embed(bug, bot):
     # Get the platform data
     platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
     # Prepare the dict to build the embed
@@ -147,7 +145,7 @@ def bug_to_embed(bug, bot):
             'emoji': Emoji.get_chat_emoji(bug.platform.name.upper())
         },
         'submitter': {
-            'username': str(bot.get_user(bug.reporter)),
+            'username': str(await Utils.username(bug.reporter)),
             'id': bug.reporter,
             'emoji': ''
         },
@@ -169,7 +167,7 @@ def bug_to_embed(bug, bot):
     # Prepare repro/notes/attachments
     stances = {'can_reproduce': 0, 'can_not_reproduce': 0}
     for i in bug.info:
-        item = {'username': str(bot.get_user(i.user)), 'id': i.user}
+        item = {'username': await Utils.username(i.user), 'id': i.user}
         if i.type == BugInfoType.attachment:
             item['link'] = i.content
             data['attachments'].append(item)
@@ -185,7 +183,8 @@ def bug_to_embed(bug, bot):
     if bug.block_type == BugBlockType.user:
         data['block_text'] = 'This report has been temporarily locked for the reporter to make edits'
     elif bug.block_type == BugBlockType.mod:
-        data['block_text'] = f'This report has been temporarily locked by {bot.get_user(bug.block_user)}: `{bug.block_reason}`'
+        name = await Utils.username(bug.block_user)
+        data['block_text'] = f'This report has been temporarily locked by {name}: `{bug.block_reason}`'
     elif bug.block_type == BugBlockType.flow:
         state = 'approved/denied'
         if stances['can_reproduce'] >= 3:
@@ -208,37 +207,44 @@ async def update_bug(bug, bot):
     channel = Configuration.get_bugchannel(channel)
     try:
         message = await channel.get_message(bug.msg_id)
-        await message.edit(embed=bug_to_embed(bug, bot))
+        await message.edit(embed=await bug_to_embed(bug, bot))
     except (Forbidden, NotFound):
         BugBotLogging.info(f"Failed to update {bug.id} on discord")
 
 
 async def add_attachment(bug, bot, user, link):
     if Checks.is_hunter(user):
-        return await real_add_attachment(bug, bot, user, link, user)
+        return await real_add_attachment(bug, bot, user, link)
     else:
         channel = Configuration.get_bugchannel("ATTACHMENTS")
         embed = Embed(description=f"{Utils.escape_markdown(str(user))} wants to attach {link} to #{bug.id}")
         message = await channel.send(embed=embed)
         await message.add_reaction(Emoji.get_emoji("APPROVE"))
         await message.add_reaction(Emoji.get_emoji("DENY"))
-        await bot.redis_connection.hmset_dict(
-            message.id,
-            bug=bug.id,
-            user=user.id,
-            link=link
-        )
+        QueuedAttachment.create(bug=bug, link=link, user=user.id, message=message.id)
         return "Your attachment has been added to the approval queue for reviewing"
 
 
-async def real_add_attachment(bug, bot, user, link, approved_by):
+async def add_pending_attachment(pending, user, bot):
+    with DataUtils.connection.atomic():
+        trello_id = None
+        if pending.bug.trello_id is not None:
+            trello_id = await bot.trello.add_attachment(pending.bug.trello_id, str(user), pending.link)
+        BugInfo.create(user=pending.user, content=pending.link, bug=pending.bug, type=BugInfoType.attachment, trello_id=trello_id)
+        name = await Utils.username(pending.user)
+        await BugBotLogging.bot_log(f"{name} attached <{pending.link}> to #{pending.bug.id} (approved by {Utils.escape_markdown(str(user))})")
+        await update_bug(pending.bug, bot)
+        pending.delete_instance()
+
+
+async def real_add_attachment(bug, bot, user, link):
     # skip the queue
     trello_id = None
     if bug.trello_id is not None:
         trello_id = await bot.trello.add_attachment(bug.trello_id, str(user), link)
     BugInfo.create(user=user.id, content=link, bug=bug, type=BugInfoType.attachment, trello_id=trello_id)
     await update_bug(bug, bot)
-    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id} (approved by {Utils.escape_markdown(str(approved_by))})")
+    await BugBotLogging.bot_log(f"{Utils.escape_markdown(str(user))} attached <{link}> to #{bug.id}")
     return f"{user.mention} Your attachment was added to #{bug.id}"
 
 

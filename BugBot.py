@@ -47,6 +47,7 @@ async def on_ready():
         Configuration.initialize(bugbot)
         DataUtils.init()
         await BugBotLogging.initialize(bugbot)
+        Utils.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
