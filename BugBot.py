@@ -8,7 +8,7 @@ from datetime import datetime
 
 import aiohttp
 import aioredis
-from discord import Activity, Embed, Colour
+from discord import Activity, Embed, Colour, NotFound
 from discord.abc import PrivateChannel
 from discord.ext import commands
 
@@ -101,7 +101,10 @@ async def on_command_error(ctx: commands.Context, error):
 
     if ctx.guild is not None:
         await asyncio.sleep(10)
+        try:
         await ctx.message.delete()
+    except NotFound:
+        pass
 
 
 def extract_info(o):
