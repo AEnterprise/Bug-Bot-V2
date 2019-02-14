@@ -101,10 +101,7 @@ async def on_command_error(ctx: commands.Context, error):
 
     if ctx.guild is not None:
         await asyncio.sleep(10)
-        try:
         await ctx.message.delete()
-    except NotFound:
-        pass
 
 
 def extract_info(o):
