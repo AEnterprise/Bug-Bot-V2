@@ -398,7 +398,10 @@ class BugReporting:
         if err is not None:
             # Delete their invoke message
             await asyncio.sleep(3)
-            await ctx.message.delete()
+            try:
+                await ctx.message.delete()
+            except discord.NotFound:
+                pass
             return
 
         # Get users who have a stance on the bug
@@ -644,7 +647,8 @@ class BugReporting:
         try:
             bug = Bug.get_by_id(bugID)
         except:
-            await ctx.message.delete()
+            if ctx.guild is not None:
+                await ctx.message.delete()
             await BugBotLogging.bot_log(f"{Emoji.get_emoji('WARNING')} {ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but the bug ID specified does not even exist.")
             return await ctx.send(f"{ctx.author.mention} I was unable to find any bug with the ID `{bugID}`.", delete_after=3.0)
         platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
@@ -659,11 +663,13 @@ class BugReporting:
         await BugBotLogging.bot_log(f"{Emoji.get_emoji('MEOWBUGHUNTER')} {ctx.author} (`{ctx.author.id}`) looked up bug ID {bugID}.")
 
     @commands.command()
+    @commands.guild_only()
     async def attach(self, ctx, bug:BugReport, link:Link):
         await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
 
     @Checks.is_bug_hunter()
     @commands.command()
+    @commands.guild_only()
     async def detach(self, ctx, bug: BugReport, link: Link):
         message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
         await ctx.send(message, delete_after=5)
