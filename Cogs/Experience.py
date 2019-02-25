@@ -11,7 +11,7 @@ from Utils.Enums import TransactionEvent
 from Utils.ExpUtils import InvalidItemError, OutOfStockError, InsufficientBalanceError
 
 
-class Experience:
+class Experience(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
@@ -19,7 +19,7 @@ class Experience:
         self._expiry_check = bot.loop.create_task(self.check_expiry())
         Pages.register('store', self.init_store, self.update_store)
 
-    def __unload(self):
+    def cog_unload(self):
         self._bug_check.cancel()
         self._expiry_check.cancel()
         Pages.unregister('store')
@@ -99,7 +99,7 @@ class Experience:
             em.add_field(name=i.name, value=content, inline=False)
         return em
 
-    @commands.command()
+    @commands.command(aliases=['shop'])
     @Checks.is_bug_hunter()
     @Checks.dm_only()
     async def store(self, ctx: commands.Context):
@@ -243,12 +243,19 @@ class Experience:
     @Checks.is_bug_hunter()
     @Checks.dm_only()
     async def buy(self, ctx: commands.Context, item_id: int):
+        member = Configuration.get_tester(ctx.author.id)
         try:
-            balance, purchase = ExpUtils.checkout(ctx.author.id, item_id, self.bot.user.id)
+            item = ExpUtils.get_store_item(item_id)
         except InvalidItemError:
             return await ctx.send(Configuration.get_var('strings', 'STORE_ITEM_NOT_FOUND'))
         except OutOfStockError:
             return await ctx.send(Configuration.get_var('strings', 'STORE_ITEM_UNAVAILABLE'))
+        # If it's a role purchase, check if they already have it
+        if item.role_id is not None:
+            if discord.utils.get(member.roles, id=item.role_id) is not None:
+                return await ctx.send(Configuration.get_var('strings', 'STORE_ALREADY_HAVE_ROLE'))
+        try:
+            balance, purchase = ExpUtils.checkout(ctx.author.id, item, self.bot.user.id)
         except InsufficientBalanceError as e:
             return await ctx.send(Configuration.get_var('strings', 'STORE_NEED_MORE_XP').format(xp=e))
         prize_log = Configuration.get_channel('PRIZE_LOG')
@@ -264,8 +271,6 @@ class Experience:
             await ctx.send(embed=em)
         else:
             if purchase.item.role_id is not None:
-                dt = self.bot.get_guild(Configuration.get_master_var('GUILD_ID'))
-                member = dt.get_member(ctx.author.id)
                 try:
                     await member.add_roles(discord.Object(id=purchase.item.role_id), reason=f'Store purchase (ID: {purchase.id})')
                 except (discord.Forbidden, discord.HTTPException):

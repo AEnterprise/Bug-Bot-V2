@@ -12,7 +12,7 @@ from discord.ext import commands
 
 from Utils import Pages, Utils, Emoji, Configuration
 
-class Role_Assigning:
+class Role_Assigning(commands.Cog, name='Roles'):
 
     def __init__(self, bot):
         self.bot = bot
@@ -31,7 +31,7 @@ class Role_Assigning:
         for emoji in Configuration.get_var("master", "SELF_ROLES"):
             await message.add_reaction(Emoji.get_emoji(emoji))
 
-
+    @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         # The bot should ignore itself.
         if payload.user_id == self.bot.user.id:
@@ -44,7 +44,7 @@ class Role_Assigning:
         await self.add_or_remove_roles(payload)
 
 
-
+    @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         # The bot should ignore itself.
         if payload.user_id == self.bot.user.id:

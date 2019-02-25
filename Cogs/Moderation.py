@@ -5,7 +5,7 @@ from discord.ext import commands
 from Utils import BugBotLogging, Checks, Configuration, Emoji
 
 
-class Moderation:
+class Moderation(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot

@@ -8,16 +8,16 @@ from discord.ext import commands
 from Utils import Pages, Utils, Emoji
 
 
-class Admin:
+class Admin(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
         Pages.register("eval", self.init_eval, self.update_eval, sender_only=True)
 
-    def __unload(self):
+    def cog_unload(self):
         Pages.unregister("eval")
 
-    async def __local_check(self, ctx):
+    async def cog_check(self, ctx):
         return await ctx.bot.is_owner(ctx.author)
 
     @commands.command(hidden=True)

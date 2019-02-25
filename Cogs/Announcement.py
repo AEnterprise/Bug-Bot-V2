@@ -5,7 +5,7 @@ from Utils import Configuration
 from Utils import Checks
 
 
-class Announcement:
+class Announcement(commands.Cog):
     def __init__(self,bot):
         self.bot = bot
             

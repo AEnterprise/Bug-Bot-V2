@@ -1,13 +1,15 @@
 import discord
+from discord.ext import commands
 
 from Utils import Emoji, Pages
 
 
-class PageHandler:
+class PageHandler(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         guild = self.bot.get_guild(payload.guild_id)
         user = None

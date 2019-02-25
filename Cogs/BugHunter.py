@@ -7,7 +7,7 @@ from Utils import Checks, BugBotLogging, Configuration
 from Utils.DataUtils import BugHunter as Hunter
 
 
-class BugHunter:
+class BugHunter(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
@@ -48,6 +48,7 @@ class BugHunter:
                    .execute())
             return True
 
+    @commands.Cog.listener()
     async def on_message(self, message):
         if not isinstance(message.channel, discord.DMChannel):
             return

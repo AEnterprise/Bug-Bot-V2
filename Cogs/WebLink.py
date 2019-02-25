@@ -3,6 +3,7 @@ from datetime import datetime
 
 import aioredis
 from aioredis.pubsub import Receiver
+from discord.ext import commands
 
 import BugBot
 from Utils import Configuration, BugBotLogging, ReportUtils, Checks, ExpUtils
@@ -10,7 +11,7 @@ from Utils.DataUtils import Bug
 from Utils.Enums import ReportSource, Platforms
 
 
-class WebLink:
+class WebLink(commands.Cog):
 
     def __init__(self, bot) -> None:
         self.bot = bot
@@ -29,7 +30,7 @@ class WebLink:
         )
         self.task = self._receiver()
 
-    def __unload(self):
+    def cog_unload(self):
         self.bot.loop.create_task(self._unload())
 
     async def _unload(self):
@@ -37,8 +38,9 @@ class WebLink:
         for c in self.receiver.channels.values():
             self.redis_link.unsubscribe(c)
         self.receiver.stop()
-        self.redis_link.close()
-        await self.redis_link.wait_closed()
+        if self.redis_link is not None:
+            self.redis_link.close()
+            await self.redis_link.wait_closed()
 
     async def init(self):
         try:

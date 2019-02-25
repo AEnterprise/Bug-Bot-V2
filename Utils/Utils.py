@@ -53,8 +53,8 @@ async def lockdown_shutdown(bot):
 
 async def cleanExit(bot, trigger):
     await BugBotLogging.bot_log(f"Shutdown triggered by {trigger}.")
-    if bot.redis is not None:
-        await bot.redis.terminate()
+    if hasattr(bot, 'redis_link'):
+        await bot.redis_link.terminate()
     await bot.aiosession.close()
     await bot.close()
 

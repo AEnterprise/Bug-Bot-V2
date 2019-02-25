@@ -156,13 +156,17 @@ def get_transactions(user_id, events=None, last=5):
             .order_by(Transaction.timestamp.desc()))
 
 
-def checkout(user_id, item_id, bot_id):
+def get_store_item(item_id):
     try:
         item = StoreItem.get_by_id(item_id)
     except StoreItem.DoesNotExist:
         raise InvalidItemError(f'Unable to find a store item with ID {item_id}')
     if not item.in_stock:
         raise OutOfStockError(f'Item {item_id} is out of stock')
+    return item
+
+
+def checkout(user_id, item, bot_id):
     try:
         balance = remove_xp(user_id, item.cost, bot_id, TransactionEvent.purchase)
     except InsufficientBalanceError:

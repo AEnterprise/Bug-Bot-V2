@@ -32,17 +32,13 @@ def platform_convert(platform):
         return [Platforms.android, '-a']
 
 
-
-
-
-class BugReporting:
+class BugReporting(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         bot.lockdown = False
         bot.lockdown_message = ""
 
-
-
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.id == self.bot.user.id:
             return
@@ -307,7 +303,7 @@ class BugReporting:
         jumplink = f'https://discordapp.com/channels/{guild_id}/{channel_id}/{msg.id}'
 
         # Post a denied message in the queue
-        queue_reply = Configuration.get_var('strings', 'BUG_DENIED_QUEUE').format(report_id=bug.id, jumplink=jumplink)
+        queue_reply = Configuration.get_var('strings', 'BUG_DENIED_QUEUE').format(title=bug.title, report_id=bug.id, jumplink=jumplink)
         await Configuration.get_bugchannel('QUEUE').send(queue_reply, delete_after=20.0)
 
         # DM the reporter
@@ -327,8 +323,8 @@ class BugReporting:
 
     async def process_stance(self, ctx, report_id, content, stance, override=False):
         err = None
-        # Escape the stance content
-        content = Utils.escape_markdown(content)
+        # Remove markdown/fix mentions
+        content = await commands.clean_content(fix_channel_mentions=True, escape_markdown=True).convert(ctx, content.lstrip('| '))
         # Try and get the bug
         bug = Bug.get_or_none(id=report_id)
         # Check we're in the queue
@@ -387,7 +383,7 @@ class BugReporting:
                 reply = 'STANCE_CHANGED'
                 log_suffix = ' (updated stance)'
 
-            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) {action} report {report_id}{log_suffix}')
+            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) {action} report {report_id}{log_suffix}: `{content}`')
 
         # Get the response string
         if err is not None:
@@ -570,8 +566,11 @@ class BugReporting:
             reply = 'REPRO_BLACKLISTED'
 
         else:
-            # Remove markdown from the content
-            content = Utils.escape_markdown(content)
+            # Remove markdown/fix mentions
+            content = await commands.clean_content(fix_channel_mentions=True, escape_markdown=True).convert(ctx, content.lstrip('| '))
+
+            # Substitute storeinfo flags
+            content = self.sub_storeinfo(content, ctx.author.id)
 
             # Set stance vars
             if stance == 'canrepro':
@@ -595,12 +594,14 @@ class BugReporting:
                 stance_obj.added = datetime.utcnow()
                 stance_obj.save()
                 await self.bot.trello.edit_comment(bug.trello_id, stance_obj.trello_id, repro)
+                log_action = f'edited a {stance} on'
             else:
                 # Add a new stance
                 comment_id = await self.bot.trello.add_comment(bug.trello_id, repro)
                 BugInfo.create(user=ctx.author.id, content=content, bug=bug, type=stance_type, trello_id=comment_id)
+                log_action = f'added a {stance} to'
 
-            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) added a {stance} to report `{bug.trello_id}` ({bug.id})')
+            await BugBotLogging.bot_log(f'{emoji} {ctx.author} (`{ctx.author.id}`) {log_action} report `{bug.trello_id}` ({bug.id}): `{content}`')
 
             # Unarchive the card (if it isn't already on the board)
             # await self.bot.trello.unarchive_card(bug.trello_id)  # TODO: Only unarchive if auto-archived
@@ -629,7 +630,6 @@ class BugReporting:
     @commands.guild_only()
     async def cannotrepro(self, ctx, bug: BugReport, *, content: str):
         await self.process_trello_repro(ctx, bug, content, 'cannotrepro')
-
 
     @commands.command(name='bug')
     @Checks.is_modinator()
@@ -668,6 +668,7 @@ class BugReporting:
         await asyncio.sleep(5)
         await ctx.message.delete()
 
+    @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: RawReactionActionEvent):
         guild = self.bot.get_guild(payload.guild_id)
         if guild is None:
