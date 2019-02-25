@@ -35,23 +35,11 @@ BACKUPS = {
     "CLOCK": "⏰"
 }
 
-SELF_ASSIGNABLE_ROLES = {
-    "linux": "🐧",
-    "android": "🤖",
-    "ios": "📱",
-    "desktop": "🖥",
-    "canary": "🐦",
-    "mac": "🍎",
-    "employee": "🍎",
-    "not employee": "🍎",
-    "admin": "🍎"
-
-}
-
 
 def initialize(bot):
     for name, eid in Configuration.get_master_var("EMOJI", {}).items():
-        emojis[name] = utils.get(bot.emojis, id=eid)
+        e = utils.get(bot.emojis, id=eid)
+        emojis[name] = e if e is not None else eid
 
 
 def get_chat_emoji(name):

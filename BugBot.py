@@ -47,6 +47,7 @@ async def on_ready():
         Configuration.initialize(bugbot)
         DataUtils.init()
         await BugBotLogging.initialize(bugbot)
+        Utils.initialize(bugbot)
         bugbot.aiosession = aiohttp.ClientSession()
         BugBotLogging.info("Loading cogs...")
         for extension in Configuration.get_master_var("COGS"):
@@ -98,11 +99,9 @@ async def on_command_error(ctx: commands.Context, error):
         # notify caller
         await ctx.send(":rotating_light: Something went wrong while executing that command :rotating_light:", delete_after=10)
 
-    await asyncio.sleep(10)
-    try:
+    if ctx.guild is not None:
+        await asyncio.sleep(10)
         await ctx.message.delete()
-    except NotFound:
-        pass
 
 
 def extract_info(o):

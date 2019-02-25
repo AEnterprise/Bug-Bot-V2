@@ -56,9 +56,12 @@ class WebLink:
     async def _receiver(self):
         async for sender, message in self.receiver.iter(encoding='utf-8', decoder=json.loads):
             try:
-                handler = self.handlers[message["type"]] if message["type"] in self.handlers else self.no_reply_handlers[message["type"]]
-                reply = dict(reply=await handler(message), uid=message["uid"])
-                await self.redis_link.publish_json("bot-web-messages", reply)
+                if message["type"] in self.handlers:
+                    reply = dict(reply=await self.handlers[message["type"]](message["content"]), uid=message["uid"])
+                    await self.redis_link.publish_json("bot-web-messages", reply)
+                else:
+                    await self.no_reply_handlers[message["type"]](message["content"])
+
             except Exception as e:
                 await BugBot.handle_exception("Dash message handling", e, None, None, None, None, message)
 

@@ -1,6 +1,3 @@
-import asyncio
-import uuid
-
 from aiohttp import web
 
 from Utils import ReportUtils, RedisMessager

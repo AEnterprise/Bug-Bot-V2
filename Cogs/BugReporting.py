@@ -13,9 +13,9 @@ from Utils import Configuration, RedisMessager, BugBotLogging, ReportUtils, ExpU
 
 from Utils import BugBotLogging, Configuration, Utils, Checks, Emoji
 from Utils.Converters import BugReport, Link
-from Utils.DataUtils import Storeinfo, Bug, BugInfo
+from Utils.DataUtils import Storeinfo, Bug, BugInfo, QueuedAttachment
 from Utils.Enums import Platforms, ReportSource, ReportError, BugBlockType, BugState, BugInfoType, TransactionEvent
-from Utils.ReportUtils import BugReportException, QueuedAttachment
+from Utils.ReportUtils import BugReportException
 from Utils.Trello import TrelloException, TrelloUtils
 
 
@@ -217,18 +217,17 @@ class BugReporting:
         return content
 
     async def complete_approval_flow(self, bug):
-        # Get reporter (or user if not in DTesters)
-        reporter = Configuration.get_tester(bug.reporter)
-        if reporter is None:
-            reporter = self.bot.get_user(bug.reporter)
+        # Get reporter name
+        reporter = await Utils.get_user(bug.reporter)
+        reporter_name = await Utils.username(bug.reporter)
 
         # Give initial XP for approval
         amount = Configuration.get_var('bugbot', 'XP').get('APPROVED_BUG', 5)
         await ExpUtils.add_xp(bug.reporter, amount, self.bot.user.id, TransactionEvent.bug_approved)
-        await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter} (`{reporter.id}`) for an approved bug')
+        await BugBotLogging.bot_log(f':moneybag: Gave {amount} XP to {reporter_name} (`{bug.reporter}`) for an approved bug')
 
         # Build the Trello content
-        content = Configuration.get_var('strings', 'TRELLO_CONTENT').format(reporter=reporter, bug=bug)
+        content = Configuration.get_var('strings', 'TRELLO_CONTENT').format(reporter=reporter_name, bug=bug)
 
         # Get the new list ID
         list_id = Configuration.get_var('bugbot', 'BUG_PLATFORMS')[bug.platform.name.upper()]['NEW_LIST']
@@ -245,7 +244,7 @@ class BugReporting:
         bug.save()
 
         # Generate a new embed
-        em = ReportUtils.bug_to_embed(bug, self.bot)
+        em = await ReportUtils.bug_to_embed(bug, self.bot)
 
         # Post the embed in the appropriate report channel
         msg = await Configuration.get_bugchannel(bug.platform.name.upper()).send(embed=em)
@@ -257,11 +256,14 @@ class BugReporting:
         # Add approvals to Trello
         for i in bug.info:
             if i.type == BugInfoType.can_reproduce:
-                repro = Configuration.get_var('strings', 'TRELLO_REPRO').format(stance='Can reproduce', content=i.content, user=self.bot.get_user(i.user))
+                repro = Configuration.get_var('strings', 'TRELLO_REPRO').format(stance='Can reproduce', content=i.content, user=await Utils.username(i.user))
                 comment_id = await self.bot.trello.add_comment(trello_id, repro)
                 i.trello_id = comment_id
                 i.save()
                 await asyncio.sleep(1)
+            elif i.type == BugInfoType.attachment:
+                i.trello_id = await self.bot.trello.add_attachment(bug.trello_id, await Utils.username(i.user), i.content)
+                i.save()
 
         trello_link = f'https://trello.com/c/{trello_id}'
 
@@ -288,7 +290,7 @@ class BugReporting:
         bug.save()
 
         # Generate a new embed
-        em = ReportUtils.bug_to_embed(bug, self.bot)
+        em = await ReportUtils.bug_to_embed(bug, self.bot)
 
         # Post the embed in the denied bugs channel
         msg = await Configuration.get_bugchannel('DENIED').send(embed=em)
@@ -309,12 +311,12 @@ class BugReporting:
         await Configuration.get_bugchannel('QUEUE').send(queue_reply, delete_after=20.0)
 
         # DM the reporter
-        reporter = self.bot.get_user(bug.reporter)
+        reporter = await Utils.get_user(bug.reporter)
         if reporter is not None and not selfdeny:
             reasons = []
             denials = [i for i in bug.info if i.type == BugInfoType.can_not_reproduce]
             for idx, i in enumerate(denials):
-                deny_user = str(self.bot.get_user(i.user))
+                deny_user = await Utils.username(i.user)
                 reasons.append(f'{idx + 1}. `{deny_user}`: `{i.content}`')
             deny_dm = Configuration.get_var('strings', 'BUG_DENIED_DM').format(title=bug.title, report_id=bug.id, reasons='\n'.join(reasons))
             try:
@@ -420,7 +422,7 @@ class BugReporting:
             bug.save()
 
             # Rebuild the embed
-            em = ReportUtils.bug_to_embed(bug, self.bot)
+            em = await ReportUtils.bug_to_embed(bug, self.bot)
 
             # Update queue message with the new embed
             queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
@@ -447,7 +449,7 @@ class BugReporting:
                 bug.save()
 
                 # Rebuild the embed
-                em = ReportUtils.bug_to_embed(bug, self.bot)
+                em = await ReportUtils.bug_to_embed(bug, self.bot)
 
                 # Update queue message with the new embed
                 queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
@@ -456,7 +458,7 @@ class BugReporting:
             await ctx.message.delete()
         else:
             # Rebuild the embed
-            em = ReportUtils.bug_to_embed(bug, self.bot)
+            em = await ReportUtils.bug_to_embed(bug, self.bot)
 
             # Update queue message with the new embed
             queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
@@ -477,13 +479,13 @@ class BugReporting:
     @commands.command()
     @commands.guild_only()
     @Checks.is_employee()
-    async def dapprove(self, ctx, report_id: int, * content: str):
+    async def dapprove(self, ctx, report_id: int, *, content: str):
         await self.process_stance(ctx, report_id, content, 'approve', override=True)
 
     @commands.command()
     @commands.guild_only()
     @Checks.is_employee()
-    async def ddeny(self, ctx, report_id: int, * content: str):
+    async def ddeny(self, ctx, report_id: int, *, content: str):
         await self.process_stance(ctx, report_id, content, 'deny', override=True)
 
     @commands.command()
@@ -535,12 +537,7 @@ class BugReporting:
             reply = 'REVOKED_STANCE'
             await BugBotLogging.bot_log(f':wastebasket: {ctx.author} (`{ctx.author.id}`) revoked their stance on report {report_id}')
 
-            # Rebuild the embed
-            em = ReportUtils.bug_to_embed(bug, self.bot)
-
-            # Update queue message with the new embed
-            queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
-            await queue_msg.edit(embed=em)
+            await ReportUtils.update_bug(bug, self.bot)
 
             # Dispatch revoke event (to cancel final approval flows)
             data = {
@@ -609,14 +606,7 @@ class BugReporting:
             # await self.bot.trello.unarchive_card(bug.trello_id)  # TODO: Only unarchive if auto-archived
 
             # Regenerate the embed
-            em = ReportUtils.bug_to_embed(bug, self.bot)
-
-            # Update message with the new embed
-            msg = await Configuration.get_bugchannel(bug.platform.name).get_message(bug.msg_id)
-            try:
-                await msg.edit(embed=em)
-            except discord.HTTPException:
-                pass
+            await ReportUtils.update_bug(bug, self.bot)
 
             # Give them some XP (if eligible)
             if Configuration.get_role('BUG_HUNTER') in ctx.author.roles and ctx.author.id != bug.reporter and stance_obj is None:
@@ -651,8 +641,7 @@ class BugReporting:
                 await ctx.message.delete()
             await BugBotLogging.bot_log(f"{Emoji.get_emoji('WARNING')} {ctx.author} (`{ctx.author.id}`) attempted to run !bug {bugID} but the bug ID specified does not even exist.")
             return await ctx.send(f"{ctx.author.mention} I was unable to find any bug with the ID `{bugID}`.", delete_after=3.0)
-        platform = Configuration.get_var('bugbot', 'BUG_PLATFORMS').get(bug.platform.name.upper(), None)
-        bug_embed = ReportUtils.bug_to_embed(bug, ctx.bot)
+        bug_embed = await ReportUtils.bug_to_embed(bug, ctx.bot)
         try:
             await ctx.author.send(embed=bug_embed)
         except discord.Forbidden:
@@ -665,18 +654,21 @@ class BugReporting:
     @commands.command()
     @commands.guild_only()
     async def attach(self, ctx, bug:BugReport, link:Link):
-        await ReportUtils.add_attachment(bug, self.bot, ctx.author, link, ctx.message)
+        await self.show_response(ctx, ReportUtils.add_attachment(bug, self.bot, ctx.author, link))
 
     @Checks.is_bug_hunter()
     @commands.command()
     @commands.guild_only()
     async def detach(self, ctx, bug: BugReport, link: Link):
-        message = await ReportUtils.remove_attachment(bug, self.bot, ctx.author, link)
+        await self.show_response(ctx, ReportUtils.remove_attachment(bug, self.bot, ctx.author, link))
+
+    async def show_response(self, ctx, supplier):
+        message = await supplier
         await ctx.send(message, delete_after=5)
         await asyncio.sleep(5)
-        await message.delete()
+        await ctx.message.delete()
 
-    async def on_raw_reaction_add(self, payload:RawReactionActionEvent):
+    async def on_raw_reaction_add(self, payload: RawReactionActionEvent):
         guild = self.bot.get_guild(payload.guild_id)
         if guild is None:
             return
@@ -685,16 +677,17 @@ class BugReporting:
 
         if str(payload.emoji) in (str(Emoji.get_emoji("APPROVE")), str(Emoji.get_emoji("DENY"))):
             message = await self.bot.get_channel(payload.channel_id).get_message(payload.message_id)
-            user = guild.get_user(payload.user_id)
-            info = await self.bot.redis_link.hgetall(payload.message_id)
-            if "bug" not in info:
-                return
-            if not Checks.is_hunter(user):
-                await message.remove_reaction(payload.emoji, user)
-                return
-            if str(payload.emoji) == str(Emoji.get_emoji("APPROVE")):
-                await ReportUtils.real_add_attachment(Bug.get_by_id(info["bug"]), self.bot, user, info["link"], self.bot.get_user(info["bug"]),)
-            await message.delete()
+            user = guild.get_member(payload.user_id)
+            info = QueuedAttachment.get_or_none(message=payload.message_id)
+            if info is not None:
+                if not Checks.is_hunter(user):
+                    await message.remove_reaction(payload.emoji, user)
+                else:
+                    if str(payload.emoji) == str(Emoji.get_emoji("APPROVE")):
+                        await ReportUtils.add_pending_attachment(info, user, self.bot)
+                    else:
+                        info.delete_instance()
+                    await message.delete()
 
 
 def setup(bot):
