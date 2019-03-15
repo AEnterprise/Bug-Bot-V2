@@ -266,6 +266,7 @@ class BugReporting(commands.Cog):
         await BugBotLogging.bot_log(f':incoming_envelope: Report {bug.id} has been fully approved and added to Trello under <{trello_link}>')
 
         # Follow new initiate flow or DM an approved message if they're already a hunter
+        reporter = Configuration.get_tester(bug.reporter)  # We need a member for this bit
         if hasattr(reporter, 'roles'):
             if Configuration.get_role('BUG_HUNTER') in reporter.roles:
                 # Already a hunter
@@ -393,13 +394,16 @@ class BugReporting(commands.Cog):
         # Reply to the user
         await ctx.send(reply, delete_after=3.0)
 
-        if err is not None:
-            # Delete their invoke message
+        async def delete_invoke_msg():
             await asyncio.sleep(3)
             try:
                 await ctx.message.delete()
             except discord.NotFound:
                 pass
+
+        self.bot.loop.create_task(delete_invoke_msg())
+
+        if err is not None:
             return
 
         # Get users who have a stance on the bug
@@ -450,8 +454,6 @@ class BugReporting(commands.Cog):
                 # Update queue message with the new embed
                 queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
                 await queue_msg.edit(embed=em)
-            await asyncio.sleep(3)
-            await ctx.message.delete()
         else:
             # Rebuild the embed
             em = await ReportUtils.bug_to_embed(bug, self.bot)
@@ -459,8 +461,6 @@ class BugReporting(commands.Cog):
             # Update queue message with the new embed
             queue_msg = await Configuration.get_bugchannel('QUEUE').get_message(bug.msg_id)
             await queue_msg.edit(embed=em)
-            await asyncio.sleep(3)
-            await ctx.message.delete()
 
     @commands.command()
     @commands.guild_only()
@@ -564,6 +564,10 @@ class BugReporting(commands.Cog):
         # Check if the word 'latest' is in the repro content
         elif 'latest' in content.lower():
             reply = 'REPRO_BLACKLISTED'
+
+        # Check the content isn't too long
+        elif len(content) > 500:
+            reply = 'STANCE_TOO_LONG'
 
         else:
             # Remove markdown/fix mentions
