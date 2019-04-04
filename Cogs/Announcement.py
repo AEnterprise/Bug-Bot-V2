@@ -5,18 +5,18 @@ from Utils import BugBotLogging, Configuration
 from Utils import Checks
 
 
-class Announcement:
+class Announcement(commands.Cog):
     def __init__(self,bot):
         self.bot = bot
  
     async def _announce_log(self, ctx, role):
-        await BugBotLogging.bot_log(f"{ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) pinged the **{role.name}** role!")
+        await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) pinged the **{role.name}** role!")
     async def _announce_update_log(self, ctx, channel):
-        await BugBotLogging.bot_log(f"{ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) edited their announcement in **{channel}**.")
+        await BugBotLogging.bot_log(f"{ctx.author} (`{ctx.author.id}`) edited their announcement in **{channel}**.")
     async def _role_mentionable(self, ctx, role):
-        await BugBotLogging.bot_log(f":exclamation: {ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) has made **{role.name}** mentionable!")
+        await BugBotLogging.bot_log(f":exclamation: {ctx.author} (`{ctx.author.id}`) has made **{role.name}** mentionable!")
     async def _role_unmentionable(self, ctx, role):
-        await BugBotLogging.bot_log(f":exclamation: {ctx.author.name}#{ctx.author.discriminator} (`{ctx.author.id}`) has made **{role.name}** unmentionable!")
+        await BugBotLogging.bot_log(f":exclamation: {ctx.author} (`{ctx.author.id}`) has made **{role.name}** unmentionable!")
             
     @Checks.is_employee()
     @commands.bot_has_permissions(manage_roles=True)       
@@ -50,7 +50,7 @@ class Announcement:
         channel = Configuration.get_channel(role_name)
         modschannel = Configuration.get_channel("modinator")
         try:
-            message = await channel.get_message(message_id)
+            message = await channel.fetch_message(message_id)
         except discord.Forbidden:
             return await ctx.send("Hmmm.. Seems like I no longer have READ_MESSAGES permission for that channel for some reason.")
         except discord.NotFound:
